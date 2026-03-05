@@ -1,9 +1,0 @@
-pyproject.toml
-src/interactions2D/__init__.py
-src/interactions2D/interaction.py
-src/interactions2D.egg-info/PKG-INFO
-src/interactions2D.egg-info/SOURCES.txt
-src/interactions2D.egg-info/dependency_links.txt
-src/interactions2D.egg-info/requires.txt
-src/interactions2D.egg-info/top_level.txt
-src/interactions2D/benchmarks/benchmark_full.py
