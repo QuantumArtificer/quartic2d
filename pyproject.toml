@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quartic2d"
+version = "0.1.0"
+description = "QUAdrature for Radial Tetra-center Interaction Coefficients: An efficient library for evaluating the matrix elements of four-center interactions in two dimensions with radially symmetric kernels using generalized atomic orbital basis and Ogata's quadrature."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+
+authors = [
+  { name = "Alex Santacruz" },
+  { name = "2DQMAT Research @ IF-UNAM" }
+]
+
+keywords = [
+  "angular harmonics",
+  "2D harmonics",
+  "orbitals",
+  "condensed-matter",
+  "materials-science"
+]
+
+dependencies = [
+  "numpy>=1.23",
+  "scipy>=1.9",
+  "matplotlib>=3.6"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

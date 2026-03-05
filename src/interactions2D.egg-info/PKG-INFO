@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: interactions2D
+Version: 0.1.0
+Summary: Interaction integrals of 2D materials using angular harmonics spectral decomposition and Ogata's quadrature.
+Author: Alex Santacruz, 2DQMAT Research @ IF-UNAM
+License: MIT
+Keywords: angular harmonics,2D harmonics,orbitals,condensed-matter,materials-science
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.23
+Requires-Dist: scipy>=1.9
+Requires-Dist: matplotlib>=3.6
