@@ -1,5 +1,5 @@
-import interactions2D as i2d
-import orbitalspectrum as orb
+import quartic2d as q2d
+import gasp2d as g2d
 
 import numpy as np
 from time import time
@@ -71,7 +71,7 @@ if analyticexample:
     rmax = 10.0
 
     ti_cdh = time()
-    f = orb.PolarDecomposition(f_xy = examplefunc['func'], 
+    f = g2d.PolarDecomposition(f_xy = examplefunc['func'], 
                               x = x, 
                               y = y, 
                               Nr = 256, 
@@ -83,23 +83,10 @@ if analyticexample:
                               interp_method = 'cubic')
     tf_cdh = time()
     print(f'Decomposition time: {tf_cdh - ti_cdh}')
-    
-    # eta = 0.01
-    # r = f.r; rho0 = f.rho[0]
-    # w = cinf_bump(r, (1-eta)*rmax, rmax)
-    # plt.plot(r, w*rho0)
-    # plt.yscale('log')
-    # plt.vlines([(1-eta)*rmax, rmax], 0, rho0.max())
-    # plt.show()
-    # # exit()
-    # fig1, ax1 = f.plot_harmonics_with_hist(title = f"{examplefunc['name']}")
-    # fig2, ax2 = f.plot_original_vs_reconstructions(title = f"{examplefunc['name']}")
-    # plt.show()
-    # plt.close()
 
     N = 1024 * 10
     ti_hoh = time()
-    F = i2d.HankelofHarmonics(cdh = f, 
+    F = q2d.HankelofHarmonics(cdh = f, 
                           q_max = 20*np.pi/f.r_cutoff[0], 
                           N = N, 
                           h = np.pi/N, 
@@ -112,7 +99,6 @@ if analyticexample:
                           )
     tf_hoh = time()
     print(f'Hankel transform time: {tf_hoh - ti_hoh}')
-    #F.plot_hankel_transforms()
     
     print(f'Hankel transform roundtrip error: {F.total_error:.4f}%')
     plt.plot(F.q[0], np.abs(F(0, F.q[0])), label = 'Analytic', lw = 3)
@@ -125,7 +111,7 @@ if analyticexample:
     plt.close()
         
     ti_V = time()
-    V = i2d.Interact(deltas, F, F, U_q, N = 1024*2)
+    V = q2d.Interact(deltas, F, F, U_q, N = 1024*2)
     tf_V = time()
     print(f'Interaction calculation time: {tf_V - ti_V}')
 

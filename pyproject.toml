@@ -26,7 +26,8 @@ keywords = [
 dependencies = [
   "numpy>=1.23",
   "scipy>=1.9",
-  "matplotlib>=3.6"
+  "matplotlib>=3.6",
+  "gasp2d>=0.1.0"
 ]
 
 [tool.setuptools.packages.find]

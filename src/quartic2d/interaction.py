@@ -1,6 +1,6 @@
 import numpy as np
 
-from numpy.fft import fft
+# from numpy.fft import fft
 from scipy.interpolate import CubicSpline
 from scipy.interpolate import RegularGridInterpolator as RGI
 from scipy.integrate import cumulative_trapezoid
@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 
 import scipy.integrate as integrate
 import hankel
-import orbitalspectrum
+import gasp2d
 
 def _phi_positive(s):
     # phi(s) = exp(-1/s) for s>0, 0 otherwise
@@ -250,7 +250,7 @@ class HankelTransform():
 
 class HankelofHarmonics():
     
-    def __init__(self, cdh: orbitalspectrum.PolarDecomposition, 
+    def __init__(self, cdh: gasp2d.PolarDecomposition, 
                  q_max: float, 
                  N: int = 2048, 
                  h: float | None = None,
