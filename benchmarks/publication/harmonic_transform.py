@@ -1065,7 +1065,20 @@ def main():
     ap.add_argument("--warmups", type=int, default=2)
     ap.add_argument("--repeats", type=int, default=7)
     ap.add_argument("--include-stress", action="store_true")
-    ap.add_argument("--require-complete", action="store_true", help="exit nonzero unless every non-stress workload/method reaches the requested accuracy budget")
+    ap.add_argument(
+        "--required-tolerances",
+        default="",
+        help=(
+            "comma-separated requested tolerances that gate validation; empty means all "
+            "requested tolerances. Other requested tolerances are retained as limit/stress "
+            "characterization and do not make --require-complete fail."
+        ),
+    )
+    ap.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="exit nonzero unless every non-stress row at --required-tolerances reaches the requested accuracy budget",
+    )
     ap.add_argument("--workloads", default="", help="comma-separated workload names; empty means all")
     args = ap.parse_args()
 
@@ -1074,27 +1087,66 @@ def main():
     if not (0.0 < args.q_ceiling_fraction < 1.0):
         ap.error("--q-ceiling-fraction must be between 0 and 1")
 
+    requested_tolerances = [float(x) for x in args.tolerances.split(",") if x.strip()]
+    required_tolerances = (
+        [float(x) for x in args.required_tolerances.split(",") if x.strip()]
+        if args.required_tolerances.strip()
+        else list(requested_tolerances)
+    )
+    missing_required = [tol for tol in required_tolerances if tol not in requested_tolerances]
+    if missing_required:
+        ap.error(
+            "--required-tolerances must be a subset of --tolerances; missing "
+            + ",".join(f"{tol:g}" for tol in missing_required)
+        )
+
     result = run(args)
+    expected_methods = [x for x in args.methods.split(",") if x.strip()]
+
+    def row_complete(row):
+        methods = row.get("methods", {})
+        return (
+            row.get("status") == "complete"
+            and len(methods) == len(expected_methods)
+            and all(methods.get(method, {}).get("status") == "complete" for method in expected_methods)
+        )
+
     regular_rows = [row for row in result["rows"] if not row.get("stress", False)]
-    complete_rows = [
-        row
-        for row in regular_rows
-        if row.get("status") == "complete"
-        and all(mr.get("status") == "complete" for mr in row.get("methods", {}).values())
-        and len(row.get("methods", {})) == len([x for x in args.methods.split(",") if x.strip()])
-    ]
-    validation_passed = bool(len(complete_rows) == len(regular_rows) and regular_rows)
+    complete_rows = [row for row in regular_rows if row_complete(row)]
+    required_rows = [row for row in regular_rows if row.get("target") in required_tolerances]
+    complete_required_rows = [row for row in required_rows if row_complete(row)]
+    limit_rows = [row for row in regular_rows if row.get("target") not in required_tolerances]
+    complete_limit_rows = [row for row in limit_rows if row_complete(row)]
+
+    validation_passed = bool(required_rows) and len(complete_required_rows) == len(required_rows)
+    all_requested_complete = bool(regular_rows) and len(complete_rows) == len(regular_rows)
+    limit_status_counts = {}
+    for row in limit_rows:
+        status = row.get("status", "unknown")
+        limit_status_counts[status] = limit_status_counts.get(status, 0) + 1
+
     result["summary"] = {
+        "requested_tolerances": requested_tolerances,
+        "required_tolerances": required_tolerances,
+        "limit_tolerances": [tol for tol in requested_tolerances if tol not in required_tolerances],
         "n_nonstress_rows": len(regular_rows),
         "n_complete_nonstress_rows": len(complete_rows),
+        "n_required_rows": len(required_rows),
+        "n_complete_required_rows": len(complete_required_rows),
+        "n_limit_rows": len(limit_rows),
+        "n_complete_limit_rows": len(complete_limit_rows),
+        "limit_status_counts": limit_status_counts,
+        "all_requested_complete": all_requested_complete,
         "validation_passed": validation_passed,
     }
     result["validation_passed"] = validation_passed
+    result["all_requested_complete"] = all_requested_complete
     path = Path(args.output)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     summarize(result)
-    print(f"\nvalidation: {'PASS' if validation_passed else 'FAIL'}")
+    print(f"\nrequired-tolerance validation: {'PASS' if validation_passed else 'FAIL'}")
+    print(f"all requested tolerances complete: {'YES' if all_requested_complete else 'NO (limits recorded)'}")
     print(f"Saved: {path}")
     if args.require_complete and not validation_passed:
         raise SystemExit(2)

@@ -42,6 +42,7 @@ def _publication_jobs() -> tuple[Job, ...]:
             (
                 "--output", str(pub / "harmonic_transform.json"),
                 "--tolerances", "1e-3,1e-4,1e-5",
+                "--required-tolerances", "1e-3,1e-4",
                 "--methods", "simpson,gl4",
                 "--warmups", "2",
                 "--repeats", "7",

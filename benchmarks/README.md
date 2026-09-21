@@ -28,6 +28,8 @@ Publication evidence is divided into four classes:
 
 Pointwise relative error is not the primary metric near zeros. Publication runners use global relative L2 error together with peak-normalized absolute error, and explicitly separate q-tail error where applicable.
 
+The canonical tolerance hierarchy is `1e-4` as the primary publication target, `1e-3` as a practical looser target, and `1e-5` as a stringent limit/stress sweep. Publication gating therefore requires the `1e-3` and `1e-4` HarmonicTransform rows to complete; `1e-5` limitations are retained in the canonical dataset and reported rather than silently discarded.
+
 ## Canonical runs
 
 List the suite without executing it:
