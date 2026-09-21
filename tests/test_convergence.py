@@ -356,3 +356,32 @@ def test_fftlog_convergence_evaluates_only_admissible_bias_windows_once():
     assert all(bias not in {-0.65, -0.60, -0.40, -0.35} for _, bias in calls)
     assert len(calls) == len(set(calls))
     assert len(calls) == 9
+
+
+def test_fixed_order_convergence_falls_back_to_verified_stability_when_order_is_wrong():
+    from quartic2d._convergence import converge_fixed_order_sequence
+
+    exact = np.array([1.0])
+
+    def evaluator(parameters):
+        # Deliberately first-order rather than the nominal GL4 eighth order.
+        # The Richardson order gate must reject it, but two consecutive small
+        # changes at the requested budget are still a valid conservative
+        # self-convergence certificate.
+        s = parameters["subdivisions"]
+        return exact + np.array([1.0e-2 / s])
+
+    result = converge_fixed_order_sequence(
+        "gl4",
+        "subdivisions",
+        (1, 2, 4, 8, 16, 32, 64),
+        evaluator,
+        expected_order=8,
+        rtol=5.0e-4,
+    )
+
+    assert result.converged
+    assert result.metadata["fallback_verification"]["kind"] == "verified_sequence_fallback"
+    assert "verified_by_stable_refinement" in next(
+        step.metadata for step in result.steps if step.converged
+    )

@@ -1119,8 +1119,11 @@ class Interaction:
         Momentum-space harmonic representations.
     U_q : callable
         Radially symmetric momentum-space interaction kernel.
-    method : {'fftlog', 'trapezoid', 'simpson', 'gl4', 'gl8'}, default='fftlog'
-        Numerical method used for the interaction Hankel transform.
+    method : {'fftlog', 'trapezoid', 'simpson', 'gl4', 'gl8'}, default='gl4'
+        Numerical method used for the interaction Hankel transform. GL4 is the
+        benchmarked general-purpose default; FFTLog remains available as a
+        specialist high-throughput backend when its convergence certificate is
+        satisfied.
     interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
         Interpolator used for sampled momentum-space harmonics.
     n : int, default=512
@@ -1156,7 +1159,7 @@ class Interaction:
         field2: HarmonicTransform,
         U_q: Callable,
         *,
-        method: str = "fftlog",
+        method: str = "gl4",
         interpolator: str = "cubic",
         n: int = 512,
         bias: float = -0.5,
@@ -1237,9 +1240,11 @@ class Interaction:
         *,
         rtol: float = 1.0e-4,
         atol: float = 1.0e-12,
-        method: str = "simpson",
+        method: str = "gl4",
         interpolator: str = "cubic",
-        subdivisions: Iterable[int] = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512),
+        subdivisions: Iterable[int] = (
+            1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048
+        ),
         n_values: Iterable[int] = (128, 256, 512, 1024, 2048, 4096),
         bias: float = -0.5,
         bias_values: Iterable[float] = (-0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35),

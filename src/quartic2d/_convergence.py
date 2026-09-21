@@ -563,6 +563,37 @@ def converge_fixed_order_sequence(
             steps[selected_index].metadata["verified_by_triplet_ending_at"] = parameter_sets[i]
             break
 
+    fallback_verification: dict[str, Any] = {}
+    if selected_index is None:
+        # Known-order Richardson verification can become unreliable on strongly
+        # oscillatory or nodal integrals even when the refinement sequence is
+        # numerically stable.  Do not weaken the tolerance in that regime: fall
+        # back to the generic one-level look-ahead certificate and require two
+        # consecutive refinement changes to satisfy the same rtol/atol budget.
+        stable_flags = [False] * len(values)
+        for j in range(1, len(values)):
+            stable, rel, rel_inf, abs_inf = _meets_tolerance(
+                values[j], values[j - 1], rtol, atol
+            )
+            stable_flags[j] = bool(stable)
+            if steps[j].relative_l2_change is None:
+                steps[j].relative_l2_change = rel
+                steps[j].relative_linf_change = rel_inf
+                steps[j].absolute_linf_change = abs_inf
+            if j >= 2 and stable_flags[j - 1] and stable_flags[j]:
+                selected_index = j - 1
+                steps[selected_index].converged = True
+                steps[selected_index].metadata["verified_by_stable_refinement"] = (
+                    parameter_sets[j]
+                )
+                fallback_verification = {
+                    "kind": "verified_sequence_fallback",
+                    "selected_index": selected_index,
+                    "selected_parameters": parameter_sets[selected_index],
+                    "verified_by": parameter_sets[j],
+                }
+                break
+
     if selected_index is None:
         selected_index = len(values) - 1
         resolution_converged = False
@@ -584,6 +615,7 @@ def converge_fixed_order_sequence(
             "refinement_factor": refinement_factor,
             "minimum_order_fraction": minimum_order_fraction,
             "last_verification": verification,
+            "fallback_verification": fallback_verification,
             "status": "converged" if resolution_converged else "tested_parameter_limit_reached",
         },
     )

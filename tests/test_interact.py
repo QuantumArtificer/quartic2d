@@ -190,7 +190,7 @@ def test_ogata_reuses_transform_objects_by_order(monkeypatch):
     assert len(calls) == 3
     assert set(calls) == {0, 2, 4}
 
-def test_fftlog_is_default_interaction_method():
+def test_gl4_is_default_interaction_method():
     h = AnalyticHarmonics({0: gaussian_transform}, q_max=12.0, n_q=513)
     result = Interaction(
         np.array([[0.1, 0.0], [1.0, 0.0], [10.0, 0.0]]),
@@ -198,7 +198,7 @@ def test_fftlog_is_default_interaction_method():
         h,
         lambda q: 2.0 * np.pi / np.asarray(q),
     )
-    assert result.method == "fftlog"
+    assert result.method == "gl4"
     assert np.all(np.isfinite(result.V))
 
 
