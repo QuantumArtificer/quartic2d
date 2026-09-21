@@ -30,6 +30,10 @@ Pointwise relative error is not the primary metric near zeros. Publication runne
 
 The canonical tolerance hierarchy is `1e-4` as the primary publication target, `1e-3` as a practical looser target, and `1e-5` as a stringent limit/stress sweep. Publication gating therefore requires the `1e-3` and `1e-4` HarmonicTransform rows to complete; `1e-5` limitations are retained in the canonical dataset and reported rather than silently discarded.
 
+Large-displacement stage-specific and cross-stage correctness jobs use 12 logarithmically spaced displacement magnitudes across $10^2\leq\delta\leq10^4$, with the deterministic angle sweep used by the benchmark harness. This is the prevalidated oracle grid for the strict reference-stability budget. The more expensive true end-to-end large-displacement benchmark uses four representative logarithmically spaced magnitudes spanning the same interval; its role is full-stack composition validation rather than repeating the denser stage-specific sweep. Standard-domain correctness and performance timing retain 32 displacement samples.
+
+The large-displacement cross-stage job exercises Simpson, GL4, FFTLog, and the private Ogata benchmark backend. Its correctness gate is safety-oriented: every emitted automatic certificate must pass the independent dense-field reference. Safe backend refusals are allowed, and automatically sampled HarmonicTransform inputs are additionally subjected to the production q-boundary robustness probe. Per-case coverage is reported separately so an unsupported upstream representation cannot be hidden by a backend self-convergence certificate.
+
 ## Canonical runs
 
 List the suite without executing it:

@@ -1108,6 +1108,46 @@ class HarmonicTransform:
             )
 
 
+class _BoundaryTaperedField:
+    """Read-only momentum field with a smooth taper at verified q support.
+
+    This helper is used only as a downstream robustness probe during automatic
+    Interaction calibration.  It preserves the native q grid and retained
+    harmonics, while multiplying automatically sampled HarmonicTransform data
+    by a half-cosine window over the final fraction of represented q support.
+    """
+
+    def __init__(self, field, taper_fraction: float):
+        taper_fraction = float(taper_fraction)
+        if not np.isfinite(taper_fraction) or not (0.0 < taper_fraction < 1.0):
+            raise ValueError("taper_fraction must satisfy 0 < value < 1.")
+
+        self._m_values = np.asarray(field.m_values, dtype=int).copy()
+        self.q = np.asarray(field.q, dtype=float).copy()
+        if self.q.ndim != 1 or self.q.size < 3:
+            raise ValueError(
+                "boundary robustness requires a one-dimensional q grid with at least three samples."
+            )
+        q_max = float(self.q[-1])
+        if not np.isfinite(q_max) or q_max <= 0.0:
+            raise ValueError("boundary robustness requires positive finite q support.")
+
+        q_start = (1.0 - taper_fraction) * q_max
+        window = np.ones_like(self.q)
+        mask = self.q > q_start
+        phase = (self.q[mask] - q_start) / (q_max - q_start)
+        window[mask] = 0.5 * (1.0 + np.cos(np.pi * phase))
+
+        self.F_q = {
+            int(m): np.asarray(field.F_q[int(m)], dtype=np.complex128) * window
+            for m in self._m_values
+        }
+
+    @property
+    def m_values(self) -> np.ndarray:
+        return self._m_values.copy()
+
+
 class Interaction:
     r"""Evaluate a radial-kernel interaction between transformed fields.
 
@@ -1256,14 +1296,22 @@ class Interaction:
             65536, 131072, 262144, 524288,
         ),
         ogata_verification_levels: int = 4,
+        q_boundary_check: bool = True,
+        q_boundary_taper_fraction: float = 0.1,
+        q_boundary_budget_fraction: float = 0.5,
         verbose: bool = True,
     ):
         r"""Find interaction-transform parameters that meet an explicit tolerance.
 
-        This is the expensive, opt-in calibration path.  It converges only the
-        interaction integral on the momentum-space fields supplied here; field
-        construction, finite q support, and upstream interpolation errors remain
-        external to this result.
+        This is the expensive, opt-in calibration path.  It converges the
+        interaction integral on the momentum-space fields supplied here.  When
+        either input is a HarmonicTransform built from automatic q-sampling, a
+        second downstream robustness probe smoothly tapers the outer 10% of that
+        verified q interval and requires the requested interaction to remain
+        stable.  This prevents a numerically converged backend from certifying an
+        observable that is still sensitive to the finite upstream q boundary.
+        Generic fixed fields without an attached q-sampling certificate retain
+        the historical represented-input semantics.
 
         Finite-grid rules exploit their known asymptotic order and use a
         three-resolution Richardson check before selecting the cheapest verified
@@ -1282,11 +1330,20 @@ class Interaction:
             converge_fixed_order_sequence,
             converge_fftlog_bias_resolution,
             converge_ogata_coupled,
+            relative_l2_error,
+            relative_linf_error,
+            absolute_linf_error,
         )
 
         method = _validate_interaction_method(method, allow_experimental=cls._allow_experimental_methods)
         interpolator = validate_interpolator(interpolator)
         deltas = cls._validate_deltas(deltas)
+        q_boundary_taper_fraction = float(q_boundary_taper_fraction)
+        q_boundary_budget_fraction = float(q_boundary_budget_fraction)
+        if not np.isfinite(q_boundary_taper_fraction) or not (0.0 < q_boundary_taper_fraction < 1.0):
+            raise ValueError("q_boundary_taper_fraction must satisfy 0 < value < 1.")
+        if not np.isfinite(q_boundary_budget_fraction) or not (0.0 < q_boundary_budget_fraction <= 1.0):
+            raise ValueError("q_boundary_budget_fraction must satisfy 0 < value <= 1.")
 
         calibration = cls.__new__(cls)
         calibration._initialize(
@@ -1391,6 +1448,99 @@ class Interaction:
             search.metadata["legacy_ogata_verification_levels"] = int(
                 ogata_verification_levels
             )
+
+        # A self-converged interaction backend can still be wrong when the
+        # observable is conditioned on tiny differences near the finite q
+        # boundary of an automatically sampled HarmonicTransform.  Probe that
+        # upstream support without an external reference by smoothly removing
+        # only the final q-window and requiring the selected production result
+        # to remain stable.  The check is intentionally limited to fields that
+        # carry an automatic q-sampling certificate; fixed user-supplied fields
+        # continue to mean "integrate the represented input as given".
+        sampled_inputs = [
+            field
+            for field in (field1, field2)
+            if getattr(field, "sampling_convergence", None) is not None
+        ]
+        boundary_metadata = {
+            "enabled": bool(q_boundary_check),
+            "eligible_input_count": len(sampled_inputs),
+            "tested": False,
+            "taper_fraction": q_boundary_taper_fraction,
+            "budget_fraction": q_boundary_budget_fraction,
+            "requested_rtol": float(rtol),
+            "requested_atol": float(atol),
+        }
+        if q_boundary_check and search.converged and sampled_inputs:
+            tapered1 = (
+                _BoundaryTaperedField(field1, q_boundary_taper_fraction)
+                if getattr(field1, "sampling_convergence", None) is not None
+                else field1
+            )
+            tapered2 = (
+                _BoundaryTaperedField(field2, q_boundary_taper_fraction)
+                if getattr(field2, "sampling_convergence", None) is not None
+                else field2
+            )
+            selected = dict(search.selected_parameters)
+            probe = cls(
+                deltas,
+                tapered1,
+                tapered2,
+                U_q,
+                method=method,
+                interpolator=interpolator,
+                n=int(selected.get("n", 512)),
+                bias=float(selected.get("bias", bias)),
+                subdivisions=int(selected.get("subdivisions", 1)),
+                N=int(selected.get("N", 1024)),
+                h=selected.get("h", None),
+            )
+            baseline = np.asarray(search.selected_values, dtype=np.complex128)
+            tapered_values = np.asarray(probe.V, dtype=np.complex128)
+            rel_l2 = relative_l2_error(tapered_values, baseline)
+            rel_linf = relative_linf_error(tapered_values, baseline)
+            abs_linf = absolute_linf_error(tapered_values, baseline)
+            peak = float(np.max(np.abs(baseline))) if baseline.size else 0.0
+            boundary_rtol = q_boundary_budget_fraction * float(rtol)
+            boundary_atol = q_boundary_budget_fraction * float(atol)
+            passed = bool(
+                np.isfinite(rel_l2)
+                and rel_l2 <= boundary_rtol
+                and np.isfinite(abs_linf)
+                and abs_linf <= boundary_atol + boundary_rtol * peak
+            )
+            q_max_values = [
+                float(np.asarray(field.q, dtype=float)[-1]) for field in sampled_inputs
+            ]
+            delta_max = float(np.max(np.linalg.norm(deltas, axis=1)))
+            boundary_metadata.update(
+                {
+                    "tested": True,
+                    "passed": passed,
+                    "boundary_rtol": boundary_rtol,
+                    "boundary_atol": boundary_atol,
+                    "relative_l2_change": rel_l2,
+                    "relative_linf_change": rel_linf,
+                    "absolute_linf_change": abs_linf,
+                    "reference_peak": peak,
+                    "q_max_values": q_max_values,
+                    "delta_max": delta_max,
+                    "max_q_delta": max(q_max_values) * delta_max,
+                    "status": "passed" if passed else "upstream_q_boundary_not_robust",
+                }
+            )
+            if not passed:
+                search.hyperparameter_robust = False
+                search.metadata["pre_boundary_status"] = search.metadata.get("status")
+                search.metadata["status"] = "upstream_q_boundary_not_robust"
+        elif not q_boundary_check:
+            boundary_metadata["status"] = "disabled"
+        elif not sampled_inputs:
+            boundary_metadata["status"] = "not_applicable_fixed_input"
+        else:
+            boundary_metadata["status"] = "not_tested_backend_unconverged"
+        search.metadata["q_boundary_robustness"] = boundary_metadata
 
         result = InteractionConvergenceResult(
             search=search,

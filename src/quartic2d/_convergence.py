@@ -334,9 +334,11 @@ class InteractionConvergenceResult:
 
     The expensive convergence study is kept separate from production use.  The
     selected backend parameters can be reused with :meth:`interaction` without
-    repeating the search.  Convergence is always defined on the represented
-    momentum-space inputs; upstream field sampling/support errors are external
-    to this result.
+    repeating the search.  Backend convergence is defined on the represented
+    momentum-space inputs.  When those inputs carry automatic HarmonicTransform
+    q-sampling certificates, the Interaction calibration additionally records a
+    downstream q-boundary robustness probe and refuses certification if the
+    requested observable remains sensitive to the finite upstream support.
     """
 
     search: ConvergenceResult

@@ -148,7 +148,24 @@ def main():
     ap.add_argument("--large-reference-coarse-order", type=int, default=8)
     ap.add_argument("--large-reference-coarse-phase-step", type=float, default=float(np.pi))
     ap.add_argument("--large-reference-max-levels", type=int, default=4)
-    ap.add_argument("--n-delta", type=int, default=32)
+    ap.add_argument(
+        "--n-delta",
+        type=int,
+        default=32,
+        help="fallback displacement count for every requested domain",
+    )
+    ap.add_argument(
+        "--n-delta-standard",
+        type=int,
+        default=None,
+        help="override displacement count for the standard domain",
+    )
+    ap.add_argument(
+        "--n-delta-large",
+        type=int,
+        default=None,
+        help="override displacement count for the large-displacement domain",
+    )
     ap.add_argument(
         "--subdivisions-standard",
         default=",".join(str(x) for x in DEFAULT_SUBDIVISIONS),
@@ -204,6 +221,12 @@ def main():
         "large": float(args.fftlog_preferred_bias_large),
     }
     ogata_n_values = parse_csv(args.ogata_n_values, int)
+    n_delta_by_domain = {
+        "standard": int(args.n_delta if args.n_delta_standard is None else args.n_delta_standard),
+        "large": int(args.n_delta if args.n_delta_large is None else args.n_delta_large),
+    }
+    if any(n_delta_by_domain[domain] < 2 for domain in domains):
+        raise ValueError("all requested-domain displacement counts must be at least 2")
 
     all_available_cases = validation_cases()
     if args.cases == "default":
@@ -230,7 +253,7 @@ def main():
     references = {}
     reference_stability = {}
     for domain in domains:
-        deltas = displacement_grid(args.n_delta, domain=domain)
+        deltas = displacement_grid(n_delta_by_domain[domain], domain=domain)
         for case in all_cases:
             field = fields[case.workload]
             kernel = kernels[case.kernel]
@@ -268,7 +291,7 @@ def main():
     finite_nonminimal = 0
 
     for domain in domains:
-        deltas = displacement_grid(args.n_delta, domain=domain)
+        deltas = displacement_grid(n_delta_by_domain[domain], domain=domain)
         subdivisions = subdivisions_by_domain[domain]
         biases = fftlog_bias_values[domain]
         preferred_bias = fftlog_preferred_bias[domain]
@@ -510,6 +533,9 @@ def main():
             "large_reference_coarse_phase_step": float(args.large_reference_coarse_phase_step),
             "large_reference_max_levels": int(args.large_reference_max_levels),
             "n_delta": int(args.n_delta),
+            "n_delta_by_domain": {
+                domain: int(n_delta_by_domain[domain]) for domain in domains
+            },
             "harmonic_results": str(args.harmonic_results),
             "upstream_target": float(args.upstream_target),
             "upstream_method": args.upstream_method,

@@ -114,6 +114,18 @@ from quartic2d import Interaction
 interaction = Interaction(deltas, transformed, transformed, U_q)
 ```
 
+For production calculations, use `Interaction.converge_parameters(...)` to
+calibrate the interaction backend.  If `transformed` was built from
+`HarmonicTransform.converge_parameters(...)`, Interaction also performs a
+downstream q-boundary robustness probe: it smoothly tapers only the outer part
+of the automatically selected q interval and verifies that the requested
+interaction is unchanged within a reserved fraction of the tolerance.  A
+backend may therefore be numerically self-converged but still be refused with
+`status="upstream_q_boundary_not_robust"` when the finite upstream q support is
+not adequate for the requested displacement range.  Fixed user-supplied
+momentum fields without an automatic q-sampling certificate retain the legacy
+represented-input semantics.
+
 If the first transformed field contains $M_1$ harmonics, the second contains $M_2$ harmonics, and $D$ displacements are supplied, the principal output shapes are
 
 ```text

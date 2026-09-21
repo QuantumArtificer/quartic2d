@@ -26,7 +26,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform
 from benchmarks._common import environment_metadata
 from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
 from benchmarks._interaction_suite import (
@@ -39,6 +39,7 @@ from benchmarks._interaction_suite import (
     build_fields_from_harmonic_results,
     displacement_grid,
     kernel_registry,
+    interaction_class,
     relative_l2,
     relative_peak,
     stable_reference_pair,
@@ -209,7 +210,7 @@ def main():
         field = adaptive_fields[case.workload]
         for method in methods:
             print(f"[{index:02d}/{len(cases):02d}] {case.name} | {method}", flush=True)
-            convergence = Interaction.converge_parameters(
+            convergence = interaction_class(method).converge_parameters(
                 deltas,
                 field,
                 field,
@@ -231,6 +232,13 @@ def main():
                 ),
                 verbose=False,
             )
+            boundary = convergence.search.metadata.get("q_boundary_robustness", {})
+            if convergence.converged:
+                classification = "certified"
+            elif boundary.get("status") == "upstream_q_boundary_not_robust":
+                classification = "safe_refusal_upstream_q_boundary"
+            else:
+                classification = "safe_refusal_backend"
             row = {
                 "delta_domain": args.delta_domain,
                 "case": case.name,
@@ -239,7 +247,13 @@ def main():
                 "kernel": case.kernel,
                 "method": method,
                 "automatic_converged": bool(convergence.converged),
-                "selected_parameters": convergence.parameters,
+                "selected_parameters": (
+                    convergence.parameters
+                    if convergence.converged
+                    else convergence.search.selected_parameters
+                ),
+                "classification": classification,
+                "q_boundary_robustness": boundary,
                 "convergence": convergence.to_dict(include_values=False),
             }
             if convergence.converged:
@@ -267,16 +281,25 @@ def main():
             _write(output, result)
 
     summaries = []
-    passed = True
+    false_positives = 0
     for method in methods:
         rows = [row for row in result["rows"] if row["method"] == method]
         converged = [row for row in rows if row["automatic_converged"]]
-        passing = [row for row in rows if row["reference_pass"]]
+        passing = [row for row in converged if row["reference_pass"]]
+        false_positive_rows = [row for row in converged if not row["reference_pass"]]
+        false_positives += len(false_positive_rows)
         method_summary = {
             "method": method,
             "n_cases": len(rows),
             "n_converged": len(converged),
             "n_reference_pass": len(passing),
+            "n_false_positive": len(false_positive_rows),
+            "n_upstream_boundary_refusal": sum(
+                row["classification"] == "safe_refusal_upstream_q_boundary" for row in rows
+            ),
+            "n_backend_refusal": sum(
+                row["classification"] == "safe_refusal_backend" for row in rows
+            ),
             "worst_relative_l2": max(
                 (row["relative_l2"] for row in converged), default=None
             ),
@@ -285,22 +308,61 @@ def main():
             ),
         }
         summaries.append(method_summary)
-        passed = passed and len(converged) == len(rows) and len(passing) == len(rows)
 
+    coverage = []
+    for case in cases:
+        rows = [row for row in result["rows"] if row["case"] == case.name]
+        passing = [
+            row for row in rows
+            if row["automatic_converged"] and row["reference_pass"]
+        ]
+        coverage.append(
+            {
+                "case": case.name,
+                "covered": bool(passing),
+                "certifying_methods": [row["method"] for row in passing],
+                "upstream_boundary_refusal_methods": [
+                    row["method"]
+                    for row in rows
+                    if row["classification"] == "safe_refusal_upstream_q_boundary"
+                ],
+            }
+        )
+
+    coverage_complete = all(item["covered"] for item in coverage)
+    safe_coverage = all(
+        item["covered"] or bool(item["upstream_boundary_refusal_methods"])
+        for item in coverage
+    )
+    # Cross-stage correctness is a safety test: any automatic certificate must
+    # pass the independent dense-field reference. Specialist backends may
+    # safely refuse. If no backend covers a case, the case is acceptable only
+    # when the production q-boundary guard explicitly identifies the upstream
+    # representation as unsupported for this observable.
+    passed = false_positives == 0 and safe_coverage
     result["summary"] = summaries
+    result["coverage"] = coverage
+    result["false_positives"] = int(false_positives)
+    result["coverage_complete"] = bool(coverage_complete)
+    result["safe_coverage"] = bool(safe_coverage)
     result["validation_passed"] = bool(passed)
     result["complete"] = True
     _write(output, result)
 
     print(f"\n=== adaptive pipeline validation ({args.delta_domain}) ===")
     for item in summaries:
+        l2 = "--" if item["worst_relative_l2"] is None else f"{item['worst_relative_l2']:.3e}"
+        pk = "--" if item["worst_relative_peak"] is None else f"{item['worst_relative_peak']:.3e}"
         print(
             f"{item['method']:10s} conv={item['n_converged']:2d}/{item['n_cases']:2d} "
             f"pass={item['n_reference_pass']:2d}/{item['n_cases']:2d} "
-            f"maxL2={item['worst_relative_l2']:.3e} "
-            f"maxPk={item['worst_relative_peak']:.3e}"
+            f"fp={item['n_false_positive']} q-boundary-refusal={item['n_upstream_boundary_refusal']} "
+            f"maxL2={l2} maxPk={pk}"
         )
-    print(f"validation: {'PASS' if passed else 'FAIL'}")
+    print(f"false positives: {false_positives}")
+    print(f"coverage       : {'PASS' if coverage_complete else 'INCOMPLETE'}")
+    print(f"safe coverage  : {'PASS' if safe_coverage else 'FAIL'}")
+    print(f"validation     : {'PASS' if passed else 'FAIL'}")
     print(f"Saved: {output}")
     raise SystemExit(0 if passed else 1)
 

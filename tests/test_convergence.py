@@ -385,3 +385,86 @@ def test_fixed_order_convergence_falls_back_to_verified_stability_when_order_is_
     assert "verified_by_stable_refinement" in next(
         step.metadata for step in result.steps if step.converged
     )
+
+
+def test_interaction_autoconvergence_rejects_q_boundary_sensitive_sampled_field():
+    from quartic2d import Interaction
+
+    class AutomaticallySampledField:
+        def __init__(self, *, fast_decay: bool):
+            self.q = np.linspace(0.0, 8.0, 129)
+            self.m_values = np.array([0])
+            exponent = -0.25 * self.q**2 if fast_decay else -0.02 * self.q**2
+            self.F_q = {0: np.exp(exponent).astype(np.complex128)}
+            # The concrete QSamplingResult contents are not needed by the
+            # downstream probe; non-None marks an automatically certified
+            # HarmonicTransform input.
+            self.sampling_convergence = object()
+
+    deltas = np.column_stack((np.geomspace(10.0, 100.0, 8), np.zeros(8)))
+
+    def kernel(q):
+        return np.ones_like(np.asarray(q, dtype=float))
+
+    unsafe = AutomaticallySampledField(fast_decay=False)
+    rejected = Interaction.converge_parameters(
+        deltas,
+        unsafe,
+        unsafe,
+        kernel,
+        method="gl4",
+        rtol=1.0e-3,
+        atol=1.0e-12,
+        subdivisions=(1, 2, 4, 8, 16, 32),
+        verbose=False,
+    )
+    boundary = rejected.search.metadata["q_boundary_robustness"]
+    assert rejected.search.resolution_converged
+    assert not rejected.converged
+    assert boundary["tested"]
+    assert not boundary["passed"]
+    assert boundary["status"] == "upstream_q_boundary_not_robust"
+    assert rejected.search.metadata["status"] == "upstream_q_boundary_not_robust"
+
+    safe = AutomaticallySampledField(fast_decay=True)
+    accepted = Interaction.converge_parameters(
+        deltas,
+        safe,
+        safe,
+        kernel,
+        method="gl4",
+        rtol=1.0e-3,
+        atol=1.0e-12,
+        subdivisions=(1, 2, 4, 8, 16, 32),
+        verbose=False,
+    )
+    assert accepted.converged
+    assert accepted.search.metadata["q_boundary_robustness"]["passed"]
+
+
+def test_interaction_autoconvergence_keeps_fixed_input_semantics_without_sampling_certificate():
+    from quartic2d import Interaction
+
+    class FixedField:
+        def __init__(self):
+            self.q = np.linspace(0.0, 8.0, 129)
+            self.m_values = np.array([0])
+            self.F_q = {0: np.exp(-0.02 * self.q**2).astype(np.complex128)}
+
+    field = FixedField()
+    deltas = np.column_stack((np.geomspace(10.0, 100.0, 8), np.zeros(8)))
+    result = Interaction.converge_parameters(
+        deltas,
+        field,
+        field,
+        lambda q: np.ones_like(np.asarray(q, dtype=float)),
+        method="gl4",
+        rtol=1.0e-3,
+        atol=1.0e-12,
+        subdivisions=(1, 2, 4, 8, 16, 32),
+        verbose=False,
+    )
+    assert result.converged
+    boundary = result.search.metadata["q_boundary_robustness"]
+    assert not boundary["tested"]
+    assert boundary["status"] == "not_applicable_fixed_input"
