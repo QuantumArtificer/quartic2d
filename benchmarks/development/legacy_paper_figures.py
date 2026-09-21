@@ -9,11 +9,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    from _style import DOUBLE_COLUMN, DOUBLE_COLUMN_TALL, MARKERS, apply_style, finish_axis, save_figure
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._style import DOUBLE_COLUMN, DOUBLE_COLUMN_TALL, MARKERS, apply_style, finish_axis, save_figure
-
+from benchmarks.figures._style import DOUBLE_COLUMN, DOUBLE_COLUMN_TALL, MARKERS, apply_style, finish_axis, save_figure
 METHOD_LABELS = {
     "trapezoid": "Trapezoid",
     "simpson": "Simpson",
@@ -199,7 +195,7 @@ def main():
     ap.add_argument("--release", required=True)
     ap.add_argument("--harmonic")
     ap.add_argument("--scaling")
-    ap.add_argument("--output-dir", default="paper/benchmarks/results/figures")
+    ap.add_argument("--output-dir", default="benchmarks/results/publication/figures")
     args = ap.parse_args()
     apply_style()
     release = load(args.release)

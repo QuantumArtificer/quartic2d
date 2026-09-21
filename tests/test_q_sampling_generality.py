@@ -1,19 +1,9 @@
-import sys
-from pathlib import Path
-
 import numpy as np
 import pytest
 
 from quartic2d import HarmonicTransform
 
-# ``paper`` is intentionally not an installed package (setuptools discovers
-# only ``src``), so tests that reuse manuscript reference workloads must add
-# the benchmark helper directory explicitly rather than importing ``paper``.
-_BENCHMARK_DIR = Path(__file__).resolve().parents[1] / "paper" / "benchmarks"
-if str(_BENCHMARK_DIR) not in sys.path:
-    sys.path.insert(0, str(_BENCHMARK_DIR))
-
-from run_harmonic_transform import (  # noqa: E402
+from benchmarks.publication.harmonic_transform import (
     SyntheticDecomposition,
     q_tail_l2_analytic,
     signed_exact,

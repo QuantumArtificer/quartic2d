@@ -132,21 +132,19 @@ Run the unit tests with
 python -m pytest -q
 ```
 
-Run the analytic Gaussian validation with
+Run the lightweight analytic documentation check with
 
 ```bash
-python validation/run_gaussian_validation.py --quick
+python -m benchmarks.documentation.gaussian_validation --quick
 ```
 
-Run the reduced numerical benchmark with
+The complete benchmark organization and manuscript evidence policy live in [`benchmarks/`](benchmarks/README.md). List the canonical manuscript-grade suite with
 
 ```bash
-python benchmarks/run_numerical_benchmarks.py \
-    --quick \
-    --output-dir benchmarks/results/quick
+python -m benchmarks.run_suite publication --list
 ```
 
-The full benchmark used for the v0.1.0 numerical-method assessment is archived in [`benchmarks/reference/paper_numerics_v0.1.0.json`](benchmarks/reference/paper_numerics_v0.1.0.json). Generated benchmark output is written under `benchmarks/results/` and is not tracked.
+Generated benchmark output is written under `benchmarks/results/` and is not tracked. Historical frozen datasets live under `benchmarks/reference/`; they are not silently reused as current manuscript evidence.
 
 ## Documentation
 

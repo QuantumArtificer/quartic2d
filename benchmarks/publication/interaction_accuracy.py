@@ -21,39 +21,21 @@ import numpy as np
 
 from quartic2d import Interaction
 
-try:
-    from _common import environment_metadata
-    from _interaction_suite import (
-        ALL_METHODS,
-        DEFAULT_SUBDIVISIONS,
-        PRIMARY_WORKLOADS,
-        benchmark_cases,
-        build_fields_from_harmonic_results,
-        direct_reference,
-        displacement_grid,
-        interaction_class,
-        interaction_from_parameters,
-        kernel_registry,
-        relative_l2,
-        relative_peak,
-    )
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata
-    from paper.benchmarks._interaction_suite import (
-        ALL_METHODS,
-        DEFAULT_SUBDIVISIONS,
-        PRIMARY_WORKLOADS,
-        benchmark_cases,
-        build_fields_from_harmonic_results,
-        direct_reference,
-        displacement_grid,
-        interaction_class,
-        interaction_from_parameters,
-        kernel_registry,
-        relative_l2,
-        relative_peak,
-    )
-
+from benchmarks._common import environment_metadata
+from benchmarks._interaction_suite import (
+    ALL_METHODS,
+    DEFAULT_SUBDIVISIONS,
+    PRIMARY_WORKLOADS,
+    benchmark_cases,
+    build_fields_from_harmonic_results,
+    direct_reference,
+    displacement_grid,
+    interaction_class,
+    interaction_from_parameters,
+    kernel_registry,
+    relative_l2,
+    relative_peak,
+)
 
 def parse_csv(text, cast=str):
     return tuple(cast(item.strip()) for item in text.split(",") if item.strip())
@@ -151,11 +133,11 @@ def summarize_groups(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--output", type=Path, default=Path("paper/benchmarks/results/interaction_benchmarks.json"))
+    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/publication/interaction_accuracy.json"))
     ap.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("paper/benchmarks/results/harmonic_transform.json"),
+        default=Path("benchmarks/results/publication/harmonic_transform.json"),
         help="completed HarmonicTransform benchmark used to reconstruct the fixed q-space fields",
     )
     ap.add_argument("--upstream-target", type=float, default=1.0e-4)

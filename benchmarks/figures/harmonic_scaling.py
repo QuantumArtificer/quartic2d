@@ -9,11 +9,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    from _style import DOUBLE_COLUMN, DOUBLE_COLUMN_TALL, MARKERS, apply_style, finish_axis, save_figure
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._style import DOUBLE_COLUMN, DOUBLE_COLUMN_TALL, MARKERS, apply_style, finish_axis, save_figure
-
+from benchmarks.figures._style import DOUBLE_COLUMN, DOUBLE_COLUMN_TALL, MARKERS, apply_style, finish_axis, save_figure
 
 AXIS_LABELS = {
     "N_q": r"$N_q$",
@@ -90,8 +86,8 @@ def figure_work_collapse(data, outdir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", default="paper/benchmarks/results/step2_scaling.json")
-    ap.add_argument("--output-dir", default="paper/benchmarks/results/figures")
+    ap.add_argument("--input", default="benchmarks/results/publication/harmonic_scaling.json")
+    ap.add_argument("--output-dir", default="benchmarks/results/publication/figures")
     args = ap.parse_args()
     apply_style()
     data = load(args.input)

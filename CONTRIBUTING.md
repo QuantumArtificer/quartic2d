@@ -12,13 +12,13 @@ python -m pip install -e ".[test,docs,release]"
 
 ```bash
 python -m pytest -q
-python validation/run_gaussian_validation.py --quick
+python -m benchmarks.documentation.gaussian_validation --quick
 python -m sphinx -W --keep-going -b html docs/source docs/_build/html
 ```
 
 Changes to transform conventions, phase factors, support handling, interpolation, quadrature defaults, or interaction backends should include an analytic reference test or a convergence study.
 
-Generated files under `validation/results/`, `benchmarks/results/`, `docs/_build/`, build directories, caches, and local analysis bundles should not be committed. The curated dataset under `benchmarks/reference/` is versioned release data and is intentionally tracked.
+Generated files under `benchmarks/results/`, `docs/_build/`, build directories, caches, and local analysis bundles should not be committed. The curated dataset under `benchmarks/reference/` is versioned release data and is intentionally tracked.
 
 ## Scope
 

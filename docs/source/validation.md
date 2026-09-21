@@ -25,7 +25,7 @@ $$
 Run the CI-sized validation with
 
 ```bash
-python validation/run_gaussian_validation.py --quick
+python -m benchmarks.documentation.gaussian_validation --quick
 ```
 
 ## Unit tests
@@ -48,28 +48,23 @@ The unit tests cover:
 - analytic interaction values;
 - convergence utilities, public API, and version metadata.
 
-## Numerical-method benchmark
+## Benchmark suite
 
-The release benchmark separates the sampled radial transform from the interaction transform. It uses disjoint calibration and validation sets and includes smooth, higher-order, nodal, algebraic, oscillatory, and discontinuous profiles together with multiple interaction kernels.
+The repository has one benchmark hierarchy under `benchmarks/`. Publication-grade accuracy, convergence, performance, scaling, memory, and end-to-end experiments are separated from documentation checks and development-only screens/profilers.
 
-Run a reduced benchmark with
-
-```bash
-python benchmarks/run_numerical_benchmarks.py \
-    --quick \
-    --output-dir benchmarks/results/quick
-```
-
-or the full suite with
+List the manuscript-grade suite with
 
 ```bash
-python benchmarks/run_numerical_benchmarks.py \
-    --output-dir benchmarks/results/full
+python -m benchmarks.run_suite publication --list
 ```
 
-The runner records warmup/repeated timing statistics, convergence selections, discretization and finite-support errors, requested-tolerance sweeps, large-displacement behavior, output-count scaling, and a PETAL2D-connected workload. It also generates the publication-oriented comparison figures.
+and run the complete canonical dataset with
 
-The complete full result used for the v0.1.0 numerical assessment is stored in `benchmarks/reference/paper_numerics_v0.1.0.json`.
+```bash
+python -m benchmarks.run_suite publication
+```
+
+The evidence policy and claim registry are documented in `benchmarks/README.md` and `benchmarks/CLAIMS.md`. Historical datasets under `benchmarks/reference/` are immutable release/archive artifacts rather than substitutes for a current run.
 
 ## Interpreting convergence
 

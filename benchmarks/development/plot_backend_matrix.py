@@ -165,7 +165,7 @@ def make_plots(results_path, figdir):
     if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
         supported = ", ".join(str(v) for v in SUPPORTED_SCHEMA_VERSIONS)
         raise ValueError(
-            f"plot_numerical_benchmarks.py supports benchmark schema_version(s): {supported}; "
+            f"benchmarks.development.plot_backend_matrix supports benchmark schema_version(s): {supported}; "
             f"got {schema_version!r}"
         )
 

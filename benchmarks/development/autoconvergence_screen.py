@@ -28,51 +28,27 @@ from quartic2d._experimental.ogata import (
     Interaction as OgataInteraction,
 )
 
-try:
-    from _common import environment_metadata
-    from _interaction_suite import (
-        DEFAULT_SUBDIVISIONS,
-        FINITE_METHODS,
-        build_fields_from_harmonic_results,
-        kernel_registry,
-        validation_cases,
-    )
-    from run_autoconvergence_performance import (
-        DEFAULT_BIAS_VALUES,
-        DEFAULT_N_VALUES,
-        DEFAULT_OGATA_N_VALUES,
-        DELTA_DOMAINS,
-        HARMONIC_SUBDIVISIONS,
-        SUPPORTED_HARMONIC_METHODS,
-        SUPPORTED_INTERACTION_METHODS,
-        _harmonic_rows,
-        make_displacements,
-        parse_csv,
-    )
-    from run_harmonic_transform import SyntheticDecomposition, workloads
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata
-    from paper.benchmarks._interaction_suite import (
-        DEFAULT_SUBDIVISIONS,
-        FINITE_METHODS,
-        build_fields_from_harmonic_results,
-        kernel_registry,
-        validation_cases,
-    )
-    from paper.benchmarks.run_autoconvergence_performance import (
-        DEFAULT_BIAS_VALUES,
-        DEFAULT_N_VALUES,
-        DEFAULT_OGATA_N_VALUES,
-        DELTA_DOMAINS,
-        HARMONIC_SUBDIVISIONS,
-        SUPPORTED_HARMONIC_METHODS,
-        SUPPORTED_INTERACTION_METHODS,
-        _harmonic_rows,
-        make_displacements,
-        parse_csv,
-    )
-    from paper.benchmarks.run_harmonic_transform import SyntheticDecomposition, workloads
-
+from benchmarks._common import environment_metadata
+from benchmarks._interaction_suite import (
+    DEFAULT_SUBDIVISIONS,
+    FINITE_METHODS,
+    build_fields_from_harmonic_results,
+    kernel_registry,
+    validation_cases,
+)
+from benchmarks.publication.autoconvergence_performance import (
+    DEFAULT_BIAS_VALUES,
+    DEFAULT_N_VALUES,
+    DEFAULT_OGATA_N_VALUES,
+    DELTA_DOMAINS,
+    HARMONIC_SUBDIVISIONS,
+    SUPPORTED_HARMONIC_METHODS,
+    SUPPORTED_INTERACTION_METHODS,
+    _harmonic_rows,
+    make_displacements,
+    parse_csv,
+)
+from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
 
 DEFAULT_HARMONIC_WORKLOAD = "gaussian_anisotropic_m2"
 DEFAULT_INTERACTION_CASE = "nodal_rpa"
@@ -376,12 +352,12 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("paper/benchmarks/results/autoconvergence_screen.json"),
+        default=Path("benchmarks/results/development/autoconvergence_screen.json"),
     )
     parser.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("paper/benchmarks/results/harmonic_transform.json"),
+        default=Path("benchmarks/results/publication/harmonic_transform.json"),
     )
     parser.add_argument("--stages", default="harmonic,interaction")
     parser.add_argument("--harmonic-workload", default=DEFAULT_HARMONIC_WORKLOAD)

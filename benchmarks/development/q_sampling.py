@@ -513,7 +513,7 @@ def main():
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("benchmarks/results/q_sampling.json"),
+        default=Path("benchmarks/results/development/q_sampling.json"),
     )
     args = parser.parse_args()
     result = {

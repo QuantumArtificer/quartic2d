@@ -27,27 +27,20 @@ import numpy as np
 from quartic2d import HarmonicTransform, Interaction
 from quartic2d._experimental.ogata import Interaction as OgataInteraction
 
-try:
-    from _common import environment_metadata
-    from _interaction_suite import (
-        DEFAULT_SUBDIVISIONS,
-        FINITE_METHODS,
-        build_fields_from_harmonic_results,
-        kernel_registry,
-        validation_cases,
-    )
-    from run_harmonic_transform import SyntheticDecomposition, workloads
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata
-    from paper.benchmarks._interaction_suite import (
-        DEFAULT_SUBDIVISIONS,
-        FINITE_METHODS,
-        build_fields_from_harmonic_results,
-        kernel_registry,
-        validation_cases,
-    )
-    from paper.benchmarks.run_harmonic_transform import SyntheticDecomposition, workloads
-
+from benchmarks._common import environment_metadata
+from benchmarks._interaction_suite import (
+    DEFAULT_SUBDIVISIONS,
+    DELTA_DOMAINS,
+    FFTLOG_BIAS_VALUES_LARGE,
+    FFTLOG_BIAS_VALUES_STANDARD,
+    FFTLOG_N_VALUES,
+    FINITE_METHODS,
+    LARGE_DELTA_SUBDIVISIONS,
+    build_fields_from_harmonic_results,
+    kernel_registry,
+    validation_cases,
+)
+from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
 
 SUPPORTED_HARMONIC_METHODS = ("trapezoid", "simpson", "gl4", "gl8")
 SUPPORTED_INTERACTION_METHODS = FINITE_METHODS + ("fftlog",)
@@ -63,8 +56,8 @@ DEFAULT_INTERACTION_CASES = (
     "complex_gate",
 )
 HARMONIC_SUBDIVISIONS = (1, 2, 4, 8, 16, 32)
-DEFAULT_N_VALUES = (128, 256, 512, 1024, 2048, 4096)
-DEFAULT_BIAS_VALUES = (-0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35)
+DEFAULT_N_VALUES = FFTLOG_N_VALUES
+DEFAULT_BIAS_VALUES = FFTLOG_BIAS_VALUES_STANDARD
 DEFAULT_OGATA_N_VALUES = (
     64,
     128,
@@ -81,12 +74,6 @@ DEFAULT_OGATA_N_VALUES = (
     262144,
     524288,
 )
-DELTA_DOMAINS = {
-    "standard": (1.0e-2, 1.0e2),
-    "large": (1.0e2, 1.0e4),
-}
-
-
 def parse_csv(text: str, cast=str) -> tuple:
     return tuple(cast(item.strip()) for item in text.split(",") if item.strip())
 
@@ -266,17 +253,30 @@ def interaction_class(method: str):
     return OgataInteraction if method == "ogata" else Interaction
 
 
-def interaction_parameters(method: str, *, level: str, selected: dict | None = None) -> dict:
+def interaction_parameters(
+    method: str,
+    *,
+    level: str,
+    delta_domain: str,
+    selected: dict | None = None,
+) -> dict:
     if level == "selected":
         if selected is None:
             raise ValueError("selected parameters are required")
         return dict(selected)
     if method in FINITE_METHODS:
-        subdivisions = DEFAULT_SUBDIVISIONS[0] if level == "floor" else DEFAULT_SUBDIVISIONS[-1]
+        ladder = DEFAULT_SUBDIVISIONS if delta_domain == "standard" else LARGE_DELTA_SUBDIVISIONS
+        if level == "upper" and delta_domain == "large":
+            # The large-delta ladder is intentionally deep enough for
+            # certification. Repeating its terminal point is not a useful
+            # performance baseline and can dominate the benchmark runtime.
+            return {}
+        subdivisions = ladder[0] if level == "floor" else ladder[-1]
         return {"method": method, "interpolator": "cubic", "subdivisions": int(subdivisions)}
     if method == "fftlog":
         n = DEFAULT_N_VALUES[0] if level == "floor" else DEFAULT_N_VALUES[-1]
-        return {"method": method, "interpolator": "cubic", "n": int(n), "bias": -0.5}
+        bias = -0.5 if delta_domain == "standard" else 0.0
+        return {"method": method, "interpolator": "cubic", "n": int(n), "bias": float(bias)}
     if method == "ogata":
         if level == "floor":
             return {
@@ -488,6 +488,18 @@ def run_interaction(
                         flush=True,
                     )
 
+                    finite_ladder = (
+                        DEFAULT_SUBDIVISIONS
+                        if delta_domain == "standard"
+                        else LARGE_DELTA_SUBDIVISIONS
+                    )
+                    fftlog_bias = -0.5 if delta_domain == "standard" else 0.0
+                    fftlog_bias_values = (
+                        FFTLOG_BIAS_VALUES_STANDARD
+                        if delta_domain == "standard"
+                        else FFTLOG_BIAS_VALUES_LARGE
+                    )
+
                     def calibrate():
                         return cls.converge_parameters(
                             deltas,
@@ -498,10 +510,10 @@ def run_interaction(
                             atol=1.0e-12,
                             method=method,
                             interpolator="cubic",
-                            subdivisions=DEFAULT_SUBDIVISIONS,
+                            subdivisions=finite_ladder,
                             n_values=DEFAULT_N_VALUES,
-                            bias=-0.5,
-                            bias_values=DEFAULT_BIAS_VALUES,
+                            bias=fftlog_bias,
+                            bias_values=fftlog_bias_values,
                             ogata_n_values=DEFAULT_OGATA_N_VALUES,
                             verbose=False,
                         )
@@ -548,7 +560,7 @@ def run_interaction(
                             repeats=production_repeats,
                         )
 
-                    floor_parameters = interaction_parameters(method, level="floor")
+                    floor_parameters = interaction_parameters(method, level="floor", delta_domain=delta_domain)
                     floor, _ = time_callable(
                         lambda: cls(deltas, field, field, kernel.U, **floor_parameters),
                         warmups=production_warmups,
@@ -556,7 +568,7 @@ def run_interaction(
                     )
 
                     upper = None
-                    upper_parameters = interaction_parameters(method, level="upper")
+                    upper_parameters = interaction_parameters(method, level="upper", delta_domain=delta_domain)
                     if upper_parameters:
                         upper, _ = time_callable(
                             lambda: cls(deltas, field, field, kernel.U, **upper_parameters),
@@ -693,18 +705,18 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("paper/benchmarks/results/autoconvergence_performance.json"),
+        default=Path("benchmarks/results/publication/autoconvergence_performance.json"),
     )
     parser.add_argument(
         "--profile-dir",
         type=Path,
-        default=Path("paper/benchmarks/results/profiles/autoconvergence"),
+        default=Path("benchmarks/results/development/profiles/autoconvergence"),
     )
     parser.add_argument("--stages", default="harmonic,interaction")
     parser.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("paper/benchmarks/results/harmonic_transform.json"),
+        default=Path("benchmarks/results/publication/harmonic_transform.json"),
     )
     parser.add_argument("--harmonic-workloads", default="default")
     parser.add_argument("--interaction-cases", default="default")
@@ -820,6 +832,7 @@ def main() -> None:
             "upper_candidate_timing": "production timing at the highest tested resolution candidate; numerical sufficiency is external to this performance benchmark",
             "profiling": "cProfile is executed in a separate untimed convergence run and does not contribute to reported timing samples",
             "validation_policy": "no accuracy or reference-solution claim is made by this benchmark",
+            "delta_regime_policy": "standard and large-delta regimes use distinct, predeclared convergence search boxes; large delta extends finite-rule resolution and centers the FFTLog bias search near zero, while Ogata can be included as the private oscillatory specialist",
         },
         "environment": environment_metadata(),
         "settings": {
@@ -836,6 +849,13 @@ def main() -> None:
                 for name in delta_domains
             },
             "n_delta": int(args.n_delta),
+            "finite_subdivisions_standard": list(DEFAULT_SUBDIVISIONS),
+            "finite_subdivisions_large": list(LARGE_DELTA_SUBDIVISIONS),
+            "fftlog_n_values": list(DEFAULT_N_VALUES),
+            "fftlog_bias_values_standard": list(FFTLOG_BIAS_VALUES_STANDARD),
+            "fftlog_bias_values_large": list(FFTLOG_BIAS_VALUES_LARGE),
+            "fftlog_preferred_bias_standard": -0.5,
+            "fftlog_preferred_bias_large": 0.0,
             "calibration_warmups": int(args.calibration_warmups),
             "calibration_repeats": int(args.calibration_repeats),
             "production_warmups": int(args.production_warmups),

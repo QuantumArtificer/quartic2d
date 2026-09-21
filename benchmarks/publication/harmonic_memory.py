@@ -16,11 +16,7 @@ from scipy.integrate import simpson
 
 from quartic2d import HarmonicTransform
 
-try:
-    from _common import environment_metadata, write_json
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata, write_json
-
+from benchmarks._common import environment_metadata, write_json
 
 BATCH_SIZE = 256
 MIB = 1024.0**2
@@ -363,7 +359,7 @@ def run(args) -> dict:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", default="paper/benchmarks/results/harmonic_memory.json")
+    parser.add_argument("--output", default="benchmarks/results/publication/harmonic_memory.json")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--poll-ms", type=float, default=1.0)
     parser.add_argument("--base-nr", type=int, default=1024)

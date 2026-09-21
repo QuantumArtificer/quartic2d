@@ -21,47 +21,25 @@ import numpy as np
 from quartic2d import HarmonicTransform, Interaction
 from quartic2d._sampling import converge_q_sampling
 
-try:
-    from _common import environment_metadata
-    from _interaction_suite import (
-        DEFAULT_SUBDIVISIONS,
-        build_fields_from_harmonic_results,
-        kernel_registry,
-        validation_cases,
-    )
-    from run_autoconvergence_performance import (
-        DEFAULT_BIAS_VALUES,
-        DEFAULT_N_VALUES,
-        DELTA_DOMAINS,
-        HARMONIC_SUBDIVISIONS,
-        _harmonic_rows,
-        _interaction_evaluation_count,
-        _recorded_evaluation_seconds,
-        make_displacements,
-        parse_csv,
-    )
-    from run_harmonic_transform import SyntheticDecomposition, workloads
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata
-    from paper.benchmarks._interaction_suite import (
-        DEFAULT_SUBDIVISIONS,
-        build_fields_from_harmonic_results,
-        kernel_registry,
-        validation_cases,
-    )
-    from paper.benchmarks.run_autoconvergence_performance import (
-        DEFAULT_BIAS_VALUES,
-        DEFAULT_N_VALUES,
-        DELTA_DOMAINS,
-        HARMONIC_SUBDIVISIONS,
-        _harmonic_rows,
-        _interaction_evaluation_count,
-        _recorded_evaluation_seconds,
-        make_displacements,
-        parse_csv,
-    )
-    from paper.benchmarks.run_harmonic_transform import SyntheticDecomposition, workloads
-
+from benchmarks._common import environment_metadata
+from benchmarks._interaction_suite import (
+    DEFAULT_SUBDIVISIONS,
+    build_fields_from_harmonic_results,
+    kernel_registry,
+    validation_cases,
+)
+from benchmarks.publication.autoconvergence_performance import (
+    DEFAULT_BIAS_VALUES,
+    DEFAULT_N_VALUES,
+    DELTA_DOMAINS,
+    HARMONIC_SUBDIVISIONS,
+    _harmonic_rows,
+    _interaction_evaluation_count,
+    _recorded_evaluation_seconds,
+    make_displacements,
+    parse_csv,
+)
+from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
 
 DEFAULT_HARMONIC_WORKLOAD = "gaussian_anisotropic_m2"
 DEFAULT_INTERACTION_CASE = "nodal_rpa"
@@ -327,17 +305,17 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("paper/benchmarks/results/autoconvergence_profile.json"),
+        default=Path("benchmarks/results/development/autoconvergence_profile.json"),
     )
     parser.add_argument(
         "--profile-dir",
         type=Path,
-        default=Path("paper/benchmarks/results/profiles/autoconvergence"),
+        default=Path("benchmarks/results/development/profiles/autoconvergence"),
     )
     parser.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("paper/benchmarks/results/harmonic_transform.json"),
+        default=Path("benchmarks/results/publication/harmonic_transform.json"),
     )
     parser.add_argument("--harmonic-workload", default=DEFAULT_HARMONIC_WORKLOAD)
     parser.add_argument("--interaction-case", default=DEFAULT_INTERACTION_CASE)

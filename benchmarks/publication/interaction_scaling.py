@@ -13,13 +13,8 @@ import numpy as np
 
 from quartic2d import HarmonicTransform, Interaction
 
-try:
-    from _common import environment_metadata
-    from run_harmonic_transform import SyntheticDecomposition, workloads
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata
-    from paper.benchmarks.run_harmonic_transform import SyntheticDecomposition, workloads
-
+from benchmarks._common import environment_metadata
+from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
 
 class FieldView:
     def __init__(self, source, modes=None, n_q=None):
@@ -123,7 +118,7 @@ def run_one(field1, field2, dxy, method, *, n=512, subdivisions=1, warmups=2, re
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--output", type=Path, default=Path("paper/benchmarks/results/interaction_scaling.json"))
+    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/publication/interaction_scaling.json"))
     ap.add_argument("--warmups", type=int, default=2)
     ap.add_argument("--repeats", type=int, default=7)
     ap.add_argument("--quick", action="store_true", help="Reduced smoke-test ranges; not for paper results.")
@@ -172,27 +167,27 @@ def main():
         rows.append({"branch": "fftlog", "axis": "N_p", "value": npair, "N_F": 512, "N_D": 256, "N_p": npair, **stat})
         print(f"[fftlog N_p] {npair:3d}: {1e3*stat['median_seconds']:.2f} ms")
 
-    # Finite Simpson: native q-grid size.
+    # Finite GL4 backbone: native q-grid size.
     for nq in nq_values:
         fq = FieldView(source, modes3, n_q=nq)
-        stat = run_one(fq, fq, deltas(256), "simpson", subdivisions=1, warmups=args.warmups, repeats=args.repeats)
+        stat = run_one(fq, fq, deltas(256), "gl4", subdivisions=1, warmups=args.warmups, repeats=args.repeats)
         rows.append({"branch": "finite", "axis": "N_q", "value": nq, "N_q": nq, "s_q": 1, "N_D": 256, "N_p": 9, **stat})
         print(f"[finite N_q] {nq:4d}: {1e3*stat['median_seconds']:.2f} ms")
 
     for nd in nd_finite_values:
-        stat = run_one(f3, f3, deltas(nd), "simpson", subdivisions=1, warmups=args.warmups, repeats=args.repeats)
+        stat = run_one(f3, f3, deltas(nd), "gl4", subdivisions=1, warmups=args.warmups, repeats=args.repeats)
         rows.append({"branch": "finite", "axis": "N_D", "value": nd, "N_q": 128, "s_q": 1, "N_D": nd, "N_p": 9, **stat})
         print(f"[finite N_D] {nd:4d}: {1e3*stat['median_seconds']:.2f} ms")
 
     for a, b in pair_specs:
         f1, f2 = FieldView(source, a), FieldView(source, b)
         npair = len(a) * len(b)
-        stat = run_one(f1, f2, deltas(256), "simpson", subdivisions=1, warmups=args.warmups, repeats=args.repeats)
+        stat = run_one(f1, f2, deltas(256), "gl4", subdivisions=1, warmups=args.warmups, repeats=args.repeats)
         rows.append({"branch": "finite", "axis": "N_p", "value": npair, "N_q": 128, "s_q": 1, "N_D": 256, "N_p": npair, **stat})
         print(f"[finite N_p] {npair:3d}: {1e3*stat['median_seconds']:.2f} ms")
 
     for sq in sq_values:
-        stat = run_one(f3, f3, deltas(256), "simpson", subdivisions=sq, warmups=args.warmups, repeats=args.repeats)
+        stat = run_one(f3, f3, deltas(256), "gl4", subdivisions=sq, warmups=args.warmups, repeats=args.repeats)
         nqs = sq * (128 - 1) + 1
         rows.append({"branch": "finite", "axis": "s_q", "value": sq, "N_q": 128, "N_qs": nqs, "s_q": sq, "N_D": 256, "N_p": 9, **stat})
         print(f"[finite s_q] {sq:3d}: {1e3*stat['median_seconds']:.2f} ms")
@@ -226,6 +221,7 @@ def main():
         "scope": {
             "timed_operation": "public Interaction constructor",
             "fixed_input": "one previously validated five-harmonic HarmonicTransform, with mode subsets/resampling used only to vary independent complexity dimensions",
+            "finite_backend": "GL4, matching the general Interaction backbone selected by the accuracy/convergence benchmarks",
             "excluded": "HarmonicTransform construction; accuracy convergence; plotting",
         },
         "environment": environment_metadata(),

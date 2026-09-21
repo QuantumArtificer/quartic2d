@@ -106,7 +106,7 @@ also plots the q-support, q-grid interpolation, and radial-quadrature convergenc
 
 ## Interaction transforms
 
-`Interaction` evaluates a radially symmetric momentum-space kernel `U_q(q)` for one or more displacement vectors. FFTLog is the default interaction backend; GL4, GL8, Simpson, and trapezoidal methods are also available.
+`Interaction` evaluates a radially symmetric momentum-space kernel `U_q(q)` for one or more displacement vectors. GL4 is the benchmarked general-purpose interaction backend and the public default. Simpson, GL8, and trapezoidal finite-grid methods remain available, while FFTLog is retained as a specialist high-throughput backend for workloads where its convergence checks certify the requested accuracy.
 
 ```python
 from quartic2d import Interaction

@@ -5,14 +5,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 try:
-    from _style import save_figure
+    from benchmarks.figures._style import save_figure
 except ImportError:
-    from paper.benchmarks._style import save_figure
+    from benchmarks.figures._style import save_figure
 
 MIB=1024.0**2
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--input',type=Path,default=Path('paper/benchmarks/results/interaction_memory.json')); ap.add_argument('--output-dir',type=Path,default=Path('paper/benchmarks/results/figures')); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--input',type=Path,default=Path('benchmarks/results/publication/interaction_memory.json')); ap.add_argument('--output-dir',type=Path,default=Path('benchmarks/results/publication/figures')); args=ap.parse_args()
     d=json.loads(args.input.read_text()); fig,axes=plt.subplots(2,2,figsize=(7.0,5.0))
     specs=[('fftlog','N_D',r'$N_D$'),('fftlog','N_F',r'$N_F$'),('fftlog','N_p',r'$N_p$'),('simpson','N_q',r'$N_q$')]
     for ax,(branch,axis,label) in zip(axes.ravel(),specs):

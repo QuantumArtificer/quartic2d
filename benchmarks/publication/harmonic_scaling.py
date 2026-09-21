@@ -11,11 +11,7 @@ from scipy.integrate import simpson
 
 from quartic2d import HarmonicTransform
 
-try:
-    from _common import environment_metadata, timed_call, write_json
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata, timed_call, write_json
-
+from benchmarks._common import environment_metadata, timed_call, write_json
 
 BATCH_SIZE = 256
 
@@ -300,7 +296,7 @@ def run(args):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--output", default="paper/benchmarks/results/step2_scaling.json")
+    ap.add_argument("--output", default="benchmarks/results/publication/harmonic_scaling.json")
     ap.add_argument("--warmups", type=int, default=2)
     ap.add_argument("--repeats", type=int, default=7)
     ap.add_argument("--base-nr", type=int, default=256)

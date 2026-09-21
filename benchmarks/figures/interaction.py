@@ -9,11 +9,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    from _style import DOUBLE_COLUMN, save_figure
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._style import DOUBLE_COLUMN, save_figure
-
+from benchmarks.figures._style import DOUBLE_COLUMN, save_figure
 
 METHODS = ("trapezoid", "simpson", "gl4", "gl8", "ogata", "fftlog")
 
@@ -85,7 +81,7 @@ def scaling_figure(data, outdir):
         ax.fill_between(x, q1, q3, alpha=0.15)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(r"$t$ (ms)")
-        ax.text(0.05, 0.92, "FFTLog" if branch == "fftlog" else "Simpson", transform=ax.transAxes, va="top")
+        ax.text(0.05, 0.92, "FFTLog" if branch == "fftlog" else "GL4", transform=ax.transAxes, va="top")
     fig.tight_layout()
     save_figure(fig, outdir / "interaction_scaling")
     plt.close(fig)
@@ -104,9 +100,9 @@ def scaling_figure(data, outdir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--accuracy", type=Path, default=Path("paper/benchmarks/results/interaction_benchmarks.json"))
-    ap.add_argument("--scaling", type=Path, default=Path("paper/benchmarks/results/interaction_scaling.json"))
-    ap.add_argument("--output-dir", type=Path, default=Path("paper/benchmarks/results/figures"))
+    ap.add_argument("--accuracy", type=Path, default=Path("benchmarks/results/publication/interaction_accuracy.json"))
+    ap.add_argument("--scaling", type=Path, default=Path("benchmarks/results/publication/interaction_scaling.json"))
+    ap.add_argument("--output-dir", type=Path, default=Path("benchmarks/results/publication/figures"))
     args = ap.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.accuracy.exists():

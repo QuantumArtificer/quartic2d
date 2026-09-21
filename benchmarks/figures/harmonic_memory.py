@@ -9,11 +9,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    from _style import DOUBLE_COLUMN, apply_style, finish_axis, save_figure
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._style import DOUBLE_COLUMN, apply_style, finish_axis, save_figure
-
+from benchmarks.figures._style import DOUBLE_COLUMN, apply_style, finish_axis, save_figure
 MIB = 1024.0**2
 
 
@@ -28,8 +24,8 @@ def values(rows, axis):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="paper/benchmarks/results/harmonic_memory.json")
-    parser.add_argument("--output-dir", default="paper/benchmarks/results/figures")
+    parser.add_argument("--input", default="benchmarks/results/publication/harmonic_memory.json")
+    parser.add_argument("--output-dir", default="benchmarks/results/publication/figures")
     args = parser.parse_args()
 
     data = json.loads(Path(args.input).read_text())

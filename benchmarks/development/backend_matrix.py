@@ -895,7 +895,7 @@ def main():
     parser.add_argument("--warmups", "--warmup", dest="warmups", type=int, default=2)
     parser.add_argument("--cpu", type=int, default=None, help="Optional Linux CPU affinity for reproducible timings.")
     parser.add_argument("--resume", action="store_true")
-    parser.add_argument("--output-dir", default="benchmarks/results/paper_numerics")
+    parser.add_argument("--output-dir", default="benchmarks/results/development/backend_matrix")
     args = parser.parse_args()
 
     quick = bool(args.quick)
@@ -1361,7 +1361,7 @@ def main():
     write_csv(out / "scaling.csv", result["scaling_rows"])
     write_csv(out / "petal2d.csv", result["petal2d_rows"])
 
-    from plot_numerical_benchmarks import make_plots
+    from benchmarks.development.plot_backend_matrix import make_plots
 
     make_plots(result_path, out / "figures")
     print(result_path)

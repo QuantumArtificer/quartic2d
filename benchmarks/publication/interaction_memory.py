@@ -15,12 +15,8 @@ import numpy as np
 
 from quartic2d import Interaction
 
-try:
-    from _common import environment_metadata
-    from run_interaction_scaling import FieldView, base_field, deltas, kernel
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata
-    from paper.benchmarks.run_interaction_scaling import FieldView, base_field, deltas, kernel
+from benchmarks._common import environment_metadata
+from benchmarks.publication.interaction_scaling import FieldView, base_field, deltas, kernel
 
 MIB = 1024.0**2
 MODES = {
@@ -142,7 +138,7 @@ def point(axis, value, *, method, n_p, n_d, n_f, n_q, s_q, args):
 
 def main():
     ap=argparse.ArgumentParser()
-    ap.add_argument("--output",type=Path,default=Path("paper/benchmarks/results/interaction_memory.json"))
+    ap.add_argument("--output",type=Path,default=Path("benchmarks/results/publication/interaction_memory.json"))
     ap.add_argument("--repeats",type=int,default=3)
     ap.add_argument("--poll-ms",type=float,default=1.0)
     ap.add_argument("--worker",action="store_true")
@@ -154,15 +150,15 @@ def main():
     for nd in (16,64,256,1024,4096,16384,65536): rows.append(point("N_D",nd,method="fftlog",n_p=9,n_d=nd,n_f=512,n_q=128,s_q=1,args=args))
     for nf in (128,256,512,1024,2048,4096,8192,16384): rows.append(point("N_F",nf,method="fftlog",n_p=9,n_d=256,n_f=nf,n_q=128,s_q=1,args=args))
     for npair in (1,3,9,15,25): rows.append(point("N_p",npair,method="fftlog",n_p=npair,n_d=4096,n_f=512,n_q=128,s_q=1,args=args))
-    for nd in (16,64,256,1024,4096): rows.append(point("N_D",nd,method="simpson",n_p=9,n_d=nd,n_f=512,n_q=128,s_q=1,args=args))
-    for nq in (32,64,128,256,512,1024): rows.append(point("N_q",nq,method="simpson",n_p=9,n_d=1024,n_f=512,n_q=nq,s_q=1,args=args))
+    for nd in (16,64,256,1024,4096): rows.append(point("N_D",nd,method="gl4",n_p=9,n_d=nd,n_f=512,n_q=128,s_q=1,args=args))
+    for nq in (32,64,128,256,512,1024): rows.append(point("N_q",nq,method="gl4",n_p=9,n_d=1024,n_f=512,n_q=nq,s_q=1,args=args))
     def sel(branch,axis): return [r for r in rows if r['branch']==branch and r['axis']==axis]
     fits={
       "fftlog_N_D":linear_fit(sel('fftlog','N_D'),'N_D'),
       "fftlog_N_F":linear_fit(sel('fftlog','N_F'),'N_F'),
       "fftlog_N_p":linear_fit(sel('fftlog','N_p'),'N_p'),
-      "finite_N_D":linear_fit(sel('simpson','N_D'),'N_D'),
-      "finite_N_q":linear_fit(sel('simpson','N_q'),'N_q'),
+      "finite_N_D":linear_fit(sel('gl4','N_D'),'N_D'),
+      "finite_N_q":linear_fit(sel('gl4','N_q'),'N_q'),
     }
     result={"schema":1,"benchmark":"Interaction peak-memory scaling","scope":{"metric":"Linux VmRSS sampled externally during the public Interaction constructor","reported_primary":"baseline-subtracted incremental peak RSS","fixed_fields":"constructed before baseline sampling and excluded from incremental memory"},"environment":environment_metadata(),"settings":{"repeats":args.repeats,"poll_ms":args.poll_ms},"theory":{"fftlog_memory":"Theta(N_p N_D + N_F + N_q)","finite_memory":"Theta(N_p N_D + N_D s_q N_q + N_q)"},"rows":rows,"fits":fits}
     args.output.parent.mkdir(parents=True,exist_ok=True); args.output.write_text(json.dumps(result,indent=2)); print(f"Saved: {args.output}")

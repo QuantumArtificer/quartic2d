@@ -308,11 +308,7 @@ def workloads() -> list[Workload]:
 from functools import lru_cache
 from numpy.polynomial.legendre import leggauss
 
-try:
-    from _common import environment_metadata
-except ImportError:  # pragma: no cover
-    from paper.benchmarks._common import environment_metadata
-
+from benchmarks._common import environment_metadata
 
 def radial_norm_sq(mode: Mode, upper=np.inf) -> float:
     f = lambda r: r * abs(mode.amplitude * mode.radial(r)) ** 2
@@ -788,7 +784,7 @@ def run(args):
 
     result = {
         "schema": 3,
-        "benchmark": "HarmonicTransform end-to-end",
+        "benchmark": "HarmonicTransform reference accuracy and input qualification",
         "scope": {
             "quartic2d_error_reference": (
                 "in-domain error is measured against the high-accuracy Hankel transform of the same "
@@ -1017,7 +1013,7 @@ def run(args):
 
 
 def summarize(result):
-    print("\n=== HarmonicTransform end-to-end summary ===")
+    print("\n=== HarmonicTransform reference-accuracy summary ===")
     print("In-domain Quartic2D error is referenced to the same sampled radial input supplied to the constructor.")
     print("q-support is evaluated from the known analytic benchmark transform.")
     print("PETAL2D/input representation is an external qualification and is not included in Quartic2D error.\n")
@@ -1069,6 +1065,7 @@ def main():
     ap.add_argument("--warmups", type=int, default=2)
     ap.add_argument("--repeats", type=int, default=7)
     ap.add_argument("--include-stress", action="store_true")
+    ap.add_argument("--require-complete", action="store_true", help="exit nonzero unless every non-stress workload/method reaches the requested accuracy budget")
     ap.add_argument("--workloads", default="", help="comma-separated workload names; empty means all")
     args = ap.parse_args()
 
@@ -1078,11 +1075,29 @@ def main():
         ap.error("--q-ceiling-fraction must be between 0 and 1")
 
     result = run(args)
+    regular_rows = [row for row in result["rows"] if not row.get("stress", False)]
+    complete_rows = [
+        row
+        for row in regular_rows
+        if row.get("status") == "complete"
+        and all(mr.get("status") == "complete" for mr in row.get("methods", {}).values())
+        and len(row.get("methods", {})) == len([x for x in args.methods.split(",") if x.strip()])
+    ]
+    validation_passed = bool(len(complete_rows) == len(regular_rows) and regular_rows)
+    result["summary"] = {
+        "n_nonstress_rows": len(regular_rows),
+        "n_complete_nonstress_rows": len(complete_rows),
+        "validation_passed": validation_passed,
+    }
+    result["validation_passed"] = validation_passed
     path = Path(args.output)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     summarize(result)
-    print(f"\nSaved: {path}")
+    print(f"\nvalidation: {'PASS' if validation_passed else 'FAIL'}")
+    print(f"Saved: {path}")
+    if args.require_complete and not validation_passed:
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
