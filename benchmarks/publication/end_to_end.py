@@ -311,6 +311,7 @@ def main() -> None:
 
     x = np.linspace(-args.xy_max, args.xy_max, args.nxy)
     y = np.linspace(-args.xy_max, args.xy_max, args.nxy)
+    x_mesh, y_mesh = np.meshgrid(x, y, indexing="ij")
     deltas = displacement_grid(args.n_delta, domain=args.delta_domain)
     kernels = kernel_registry()
     reference_limit = float(args.interaction_rtol * args.reference_budget_fraction)
@@ -320,7 +321,7 @@ def main() -> None:
         "schema": 1,
         "benchmark": "PETAL2D -> HarmonicTransform -> Interaction end-to-end validation",
         "scope": {
-            "input": "analytic sampled 2D functions decomposed by petal2d.PolarDecomposition",
+            "input": "analytic 2D functions sampled on a Cartesian grid, then decomposed from the sampled array by petal2d.PolarDecomposition",
             "pipeline": "PETAL2D PolarDecomposition -> QUARTIC2D HarmonicTransform automatic convergence -> Interaction automatic convergence",
             "reference": "analytic momentum-space harmonics integrated with independently stabilized direct q quadrature",
             "error_policy": "PETAL2D radial-profile error, transformed-field error, and final interaction error are all recorded separately; final interaction error is cumulative across the full pipeline",
@@ -337,6 +338,7 @@ def main() -> None:
             "ntheta": args.ntheta,
             "rmax": args.rmax,
             "petal_recon_rtol": args.petal_recon_rtol,
+            "petal_recon_err_tol_percent": 100.0 * args.petal_recon_rtol,
             "petal_profile_rtol": args.petal_profile_rtol,
             "harmonic_rtol": args.harmonic_rtol,
             "q_tail_rtol": args.q_tail_rtol,
@@ -359,14 +361,15 @@ def main() -> None:
     all_rows = []
     for index, case in enumerate(cases, start=1):
         print(f"[{index:02d}/{len(cases):02d}] PETAL2D {case.name}", flush=True)
+        sampled_density = np.asarray(case.density(x_mesh, y_mesh))
         decomposition = PolarDecomposition(
-            case.density,
+            sampled_density,
             x,
             y,
             Nr=args.nr,
             Ntheta=args.ntheta,
             rmax=args.rmax,
-            recon_err_tol=args.petal_recon_rtol,
+            recon_err_tol=100.0 * args.petal_recon_rtol,
             radial_power_tail_fraction=1.0e-10,
             radial_relative_amplitude_threshold=1.0e-7,
             origin=(0.0, 0.0),
@@ -410,7 +413,7 @@ def main() -> None:
             "kernel": case.kernel,
             "petal2d": petal,
             "harmonic_transform": {
-                "convergence": harmonic_convergence.to_dict(include_values=False),
+                "convergence": harmonic_convergence.to_dict(),
                 "analytic_error": harmonic,
             },
             "reference_stability": reference_meta,

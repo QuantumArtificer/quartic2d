@@ -172,7 +172,7 @@ def main() -> None:
                         "automatic_converged": False,
                         "classification": "missed_convergence",
                         "calibration_seconds": float(elapsed),
-                        "convergence": convergence.to_dict(include_values=False),
+                        "convergence": convergence.to_dict(),
                     }
                 )
                 missed += 1
@@ -209,7 +209,7 @@ def main() -> None:
                     "classification": (
                         "certified_reference_pass" if reference_pass else "automatic_false_positive"
                     ),
-                    "convergence": convergence.to_dict(include_values=False),
+                    "convergence": convergence.to_dict(),
                 }
             )
             write(args.output, result)
@@ -234,7 +234,7 @@ def main() -> None:
                         method=method,
                         verbose=False,
                     )
-                    convergence_dict = convergence.to_dict(include_values=False)
+                    convergence_dict = convergence.to_dict()
                 except RuntimeError as exc:
                     exception_text = str(exc)
                     refused = "Could not certify q-space support" in exception_text

@@ -58,7 +58,7 @@ def figure_axis_scaling(data, outdir):
         panel(ax, data, axis)
         ax.text(0.03, 0.94, f"({label})", transform=ax.transAxes, ha="left", va="top")
     fig.tight_layout()
-    save_figure(fig, Path(outdir) / "step2_harmonic_transform_scaling")
+    save_figure(fig, Path(outdir) / "harmonic_transform_scaling")
 
 
 def figure_work_collapse(data, outdir):
@@ -81,7 +81,7 @@ def figure_work_collapse(data, outdir):
     ax.set_ylabel(r"$t$ (ms)")
     finish_axis(ax)
     fig.tight_layout()
-    save_figure(fig, Path(outdir) / "step2_harmonic_transform_work_collapse")
+    save_figure(fig, Path(outdir) / "harmonic_transform_work_collapse")
 
 
 def main():

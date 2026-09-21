@@ -183,7 +183,7 @@ def run(args):
     }
 
     rows = []
-    print("[Step 2] N_q scaling")
+    print("[HarmonicTransform] N_q scaling")
     rows.extend(
         sweep(
             axis="n_q",
@@ -192,7 +192,7 @@ def run(args):
             args=args,
         )
     )
-    print("\n[Step 2] N_r scaling")
+    print("\n[HarmonicTransform] N_r scaling")
     rows.extend(
         sweep(
             axis="n_r",
@@ -201,7 +201,7 @@ def run(args):
             args=args,
         )
     )
-    print("\n[Step 2] N_m scaling")
+    print("\n[HarmonicTransform] N_m scaling")
     rows.extend(
         sweep(
             axis="n_m",
@@ -210,7 +210,7 @@ def run(args):
             args=args,
         )
     )
-    print("\n[Step 2] s_r scaling")
+    print("\n[HarmonicTransform] s_r scaling")
     rows.extend(
         sweep(
             axis="subdivisions",
@@ -256,9 +256,9 @@ def run(args):
 
     return {
         "schema": 2,
-        "benchmark": "Step 2 HarmonicTransform computational scaling",
+        "benchmark": "HarmonicTransform computational scaling",
         "scope": {
-            "stage": "Step 2: multi-harmonic real-space to momentum-space transform",
+            "stage": "multi-harmonic real-space to momentum-space transform",
             "timed_operation": "public HarmonicTransform constructor with explicit q_max, n_q, Simpson subdivisions, and check=False",
             "constructor_note": "check=False suppresses warning emission; the public constructor still computes its inexpensive default-grid metadata and post-transform diagnostics, so those costs are included",
             "excluded": "synthetic input construction; plotting; accuracy/convergence search",

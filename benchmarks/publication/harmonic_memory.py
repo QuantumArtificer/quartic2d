@@ -285,37 +285,36 @@ def run(args) -> dict:
     pre = [row for row in nq_rows if row["N_q"] <= BATCH_SIZE]
     post = [row for row in nq_rows if row["N_q"] >= BATCH_SIZE]
 
+    if not nq_rows or not nr_rows:
+        raise ValueError("nq-values and nr-values must each contain at least one value")
+
+    def optional_linear_fit(selected, *, x_key):
+        if len(selected) < 2:
+            return None
+        return {
+            "x": x_key,
+            "range": [int(selected[0][x_key]), int(selected[-1][x_key])],
+            **linear_fit(
+                [row[x_key] for row in selected],
+                [row["incremental_peak_rss_median_bytes"] for row in selected],
+            ),
+        }
+
     fits = {
-        "N_q_pre_batch": {
-            "x": "N_q",
-            "range": [int(pre[0]["N_q"]), int(pre[-1]["N_q"])],
-            **linear_fit(
-                [row["N_q"] for row in pre],
-                [row["incremental_peak_rss_median_bytes"] for row in pre],
-            ),
-        },
-        "N_q_post_batch": {
-            "x": "N_q",
-            "range": [int(post[0]["N_q"]), int(post[-1]["N_q"])],
-            **linear_fit(
-                [row["N_q"] for row in post],
-                [row["incremental_peak_rss_median_bytes"] for row in post],
-            ),
-        },
-        "N_r": {
-            "x": "N_s",
-            "range": [int(nr_rows[0]["N_s"]), int(nr_rows[-1]["N_s"])],
-            **linear_fit(
-                [row["N_s"] for row in nr_rows],
-                [row["incremental_peak_rss_median_bytes"] for row in nr_rows],
-            ),
-        },
+        "N_q_pre_batch": optional_linear_fit(pre, x_key="N_q"),
+        "N_q_post_batch": optional_linear_fit(post, x_key="N_q"),
+        "N_r": optional_linear_fit(nr_rows, x_key="N_s"),
     }
-    pre_slope = fits["N_q_pre_batch"]["slope_bytes_per_x"]
-    post_slope = fits["N_q_post_batch"]["slope_bytes_per_x"]
-    fits["batching_slope_ratio_post_over_pre"] = (
-        float(post_slope / pre_slope) if pre_slope != 0 else None
-    )
+    pre_fit = fits["N_q_pre_batch"]
+    post_fit = fits["N_q_post_batch"]
+    if pre_fit is None or post_fit is None:
+        fits["batching_slope_ratio_post_over_pre"] = None
+    else:
+        pre_slope = pre_fit["slope_bytes_per_x"]
+        post_slope = post_fit["slope_bytes_per_x"]
+        fits["batching_slope_ratio_post_over_pre"] = (
+            float(post_slope / pre_slope) if pre_slope != 0 else None
+        )
 
     result = {
         "schema": 1,
@@ -398,14 +397,16 @@ def main() -> None:
     print("\n=== memory fits ===")
     for name in ("N_q_pre_batch", "N_q_post_batch", "N_r"):
         fit = result["fits"][name]
+        if fit is None:
+            print(f"{name:>16s}: insufficient sweep points")
+            continue
         print(
             f"{name:>16s}: slope={fit['slope_bytes_per_x']/MIB:.6g} MiB/x, "
             f"R2={fit['r2']:.6f}"
         )
-    print(
-        "post/pre N_q slope ratio = "
-        f"{result['fits']['batching_slope_ratio_post_over_pre']:.5g}"
-    )
+    ratio = result["fits"]["batching_slope_ratio_post_over_pre"]
+    ratio_text = "--" if ratio is None else f"{ratio:.5g}"
+    print("post/pre N_q slope ratio = " + ratio_text)
     print(f"Saved: {args.output}")
 
 
