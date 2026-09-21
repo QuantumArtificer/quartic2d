@@ -1,34 +1,73 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "quartic2d"
-version = "0.1.0"
-description = "QUAdrature for Radial Tetra-center Interaction Coefficients: An efficient library for evaluating the matrix elements of four-center interactions in two dimensions with radially symmetric kernels using generalized atomic orbital basis and Ogata's quadrature."
+dynamic = ["version"]
+description = "Quadrature for radial four-center interaction coefficients in two dimensions."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
-
 authors = [
   { name = "Alex Santacruz" },
   { name = "2DQMAT Research @ IF-UNAM" }
 ]
-
 keywords = [
-  "angular harmonics",
-  "2D harmonics",
-  "orbitals",
+  "four-center-integrals",
+  "hankel-transform",
+  "angular-harmonics",
+  "two-dimensional",
+  "interactions",
   "condensed-matter",
-  "materials-science"
+  "materials-science",
+  "atomic-orbitals"
 ]
-
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Physics"
+]
 dependencies = [
   "numpy>=1.23",
   "scipy>=1.9",
   "matplotlib>=3.6",
-  "gasp2d>=0.1.0"
+  "petal2d>=0.1.0"
 ]
+
+[project.optional-dependencies]
+experimental = ["hankel>=1.2.2"]
+test = ["pytest>=8"]
+release = ["build>=1.2", "twine>=5"]
+docs = [
+  "sphinx>=7",
+  "pydata-sphinx-theme>=0.15",
+  "myst-parser>=3",
+  "sphinx-copybutton>=0.5",
+  "sphinx-design>=0.6"
+]
+
+[project.urls]
+Homepage = "https://github.com/QuantumArtificer/quartic2d"
+Documentation = "https://quantumartificer.github.io/quartic2d/"
+Repository = "https://github.com/QuantumArtificer/quartic2d"
+Issues = "https://github.com/QuantumArtificer/quartic2d/issues"
+Changelog = "https://github.com/QuantumArtificer/quartic2d/blob/main/CHANGELOG.md"
+
+[tool.setuptools.dynamic]
+version = { attr = "quartic2d._version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"

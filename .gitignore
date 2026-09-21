@@ -1,30 +1,35 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Distribution / packaging
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
-# Virtual Environments
+# Build / environments
+build/
+dist/
+.venv/
 venv/
 env/
-.env/
-.venv/
 
-# VS Code
+# Documentation build
+docs/_build/
+
+# Generated validation / benchmark outputs
+validation/results/
+benchmarks/results/
+
+# QUARTIC2D local development artifacts
+.quartic2d_backup_*/
+quartic2d_*analysis*/
+quartic2d_*analysis*.zip
+quartic2d_*diagnostic*.json
+quartic2d_*diagnostic*.py
+
+# Editors / OS
 .vscode/
+.idea/
+.DS_Store

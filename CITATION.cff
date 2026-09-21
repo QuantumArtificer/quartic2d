@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use QUARTIC2D in research, please cite the software release."
+title: "QUARTIC2D: Quadrature for Radial Tetra-center Interaction Coefficients in 2D"
+type: software
+version: 0.1.0
+abstract: >-
+  QUARTIC2D is a Python package for efficient evaluation of interaction matrix
+  elements between localized two-dimensional fields with radially symmetric
+  interaction kernels. It is built on top of PETAL2D and combines angular
+  harmonic decompositions with radial Hankel-transform and interaction
+  backends including Simpson and Gauss-Legendre quadrature, Ogata quadrature,
+  and FFTLog.
+authors:
+  - family-names: "Santacruz"
+    given-names: "Alex"
+keywords:
+  - scientific computing
+  - Hankel transform
+  - numerical quadrature
+  - two-dimensional materials
+  - interaction matrix elements
+  - condensed matter physics
+repository-code: "https://github.com/QuantumArtificer/quartic2d"
+url: "https://github.com/QuantumArtificer/quartic2d"
+license: MIT

@@ -1,0 +1,17 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CITATION.cff
+include CONTRIBUTING.md
+include RELEASING.md
+recursive-include tools *.py *.sh
+recursive-include examples *.py *.md
+recursive-include validation *.py *.md
+recursive-include benchmarks *.py *.md
+recursive-include tests *.py
+recursive-include docs *.md *.rst *.py Makefile
+prune validation/results
+prune benchmarks/results
+prune benchmarks/reference
+prune docs/_build
+global-exclude __pycache__ *.py[cod] .DS_Store
