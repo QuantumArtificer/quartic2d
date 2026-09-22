@@ -178,7 +178,7 @@ def _publication_jobs() -> tuple[Job, ...]:
                 "--warmups", "2",
                 "--repeats", "9",
             ),
-            "Fixed-parameter production timing for every independently qualified practical-tier large-displacement configuration, including conservative automatic refusals with reference-passing terminal parameters.",
+            "Fixed-parameter production timing for every independently qualified practical-tier large-displacement configuration, using minimum oracle-proven finite-rule parameters after conservative refusals and reference-passing terminal parameters for other backends.",
         ),
         Job(
             "cross-stage-standard",

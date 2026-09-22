@@ -146,7 +146,7 @@ For repeated evaluations of a prequalified workload family define
 - include only method/workload combinations that independently satisfy the target;
 - if a method is only useful for a subset of workload families, show the subset explicitly rather than averaging it together with failed families.
 
-Calibration and production measurements must come from the same benchmark configuration and machine environment. For conservative automatic refusals whose terminal parameters independently pass the reference, fixed-parameter production timing comes from `interaction-large-qualified-fixed-performance`; those points must be labeled as independently qualified rather than automatically certified. The plot may illustrate amortization; it must not imply that new workload families can skip qualification.
+Calibration and production measurements must come from the same benchmark configuration and machine environment. For conservative automatic refusals, fixed-parameter production timing comes from `interaction-large-qualified-fixed-performance`: finite rules use the minimum tested oracle-proven passing subdivision count, while other backends use a terminal configuration only when that terminal point independently passes the reference. Those points must be labeled as independently qualified rather than automatically certified. The plot may illustrate amortization; it must not imply that new workload families can skip qualification.
 
 ### Figure 5 — Computational scaling
 

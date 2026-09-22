@@ -7,9 +7,11 @@ selects configurations that already passed that benchmark's independent
 reference, and measures repeated production cost with those parameters frozen.
 
 Automatically certified rows use their selected production parameters.
-Conservative refusals are included only when the terminal configuration itself
-passed the independent reference.  Rows with no demonstrated reference-passing
-configuration are excluded.
+For conservative finite-rule refusals, the minimum tested subdivision count
+shown by the independent oracle to satisfy the target is used.  Other
+conservative refusals are included only when their terminal configuration
+itself passed the independent reference.  Rows with no demonstrated
+reference-passing configuration are excluded.
 """
 from __future__ import annotations
 
@@ -49,6 +51,25 @@ def _qualified_configuration(row: dict) -> tuple[str, dict, dict] | None:
             return None
         return "automatic_certificate", dict(row.get("selected_parameters") or {}), dict(error)
 
+    oracle = row.get("oracle") or {}
+    minimum = oracle.get("minimum_tested_subdivisions")
+    if minimum is not None:
+        for item in oracle.get("history", []):
+            if int(item.get("subdivisions", -1)) != int(minimum):
+                continue
+            if not bool(item.get("passed")):
+                return None
+            error = {
+                "relative_l2": float(item["relative_l2"]),
+                "relative_peak": float(item["relative_peak"]),
+                "passed": True,
+            }
+            return (
+                "independent_oracle_qualification",
+                {"subdivisions": int(minimum)},
+                error,
+            )
+
     terminal = row.get("terminal_reference_error") or {}
     if bool(terminal.get("passed")):
         parameters = dict(row.get("selected_parameters") or {})
@@ -76,6 +97,14 @@ def _summary(rows: list[dict]) -> dict:
                 "n_qualified_rows": len(selected),
                 "n_automatic": sum(row["qualification_kind"] == "automatic_certificate" for row in selected),
                 "n_independently_qualified_after_refusal": sum(
+                    row["qualification_kind"] != "automatic_certificate"
+                    for row in selected
+                ),
+                "n_oracle_qualified_after_refusal": sum(
+                    row["qualification_kind"] == "independent_oracle_qualification"
+                    for row in selected
+                ),
+                "n_terminal_qualified_after_refusal": sum(
                     row["qualification_kind"] == "independent_terminal_qualification"
                     for row in selected
                 ),
@@ -261,8 +290,9 @@ def main() -> None:
         "scope": {
             "accuracy_source": str(args.qualification_results),
             "qualification_rule": (
-                "time automatically certified reference-passing parameters and terminal parameters "
-                "from conservative refusals only when the independent reference already passed"
+                "time automatically certified reference-passing parameters; for conservative "
+                "finite-rule refusals use the minimum oracle-proven passing subdivision count; "
+                "otherwise use terminal parameters only when the independent reference already passed"
             ),
             "timing_policy": (
                 "no convergence search or external reference is executed in this benchmark; "
