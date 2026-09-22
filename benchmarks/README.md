@@ -28,11 +28,13 @@ Publication evidence is divided into four classes:
 
 Pointwise relative error is not the primary metric near zeros. Publication runners use global relative L2 error together with peak-normalized absolute error, and explicitly separate q-tail error where applicable.
 
-The canonical tolerance hierarchy is `1e-4` as the primary publication target, `1e-3` as a practical looser target, and `1e-5` as a stringent limit/stress sweep. Publication gating therefore requires the `1e-3` and `1e-4` HarmonicTransform rows to complete; `1e-5` limitations are retained in the canonical dataset and reported rather than silently discarded.
+The canonical tolerance hierarchy has three application roles rather than a single pass/fail ladder. `1e-3` is the practical/throughput tier for scans, fitting, optimization, and other workloads that do not require tighter numerical accuracy; `1e-4` is the primary publication validation target; and `1e-5` is a stringent limit/verification tier. Publication gating therefore requires the `1e-3` and `1e-4` HarmonicTransform rows to complete; `1e-5` limitations are retained in the canonical dataset and reported rather than silently discarded. Interaction results distinguish automatic certification from bounded backend capability so a fast method can be useful in a qualified operating regime without being presented as universally reliable.
 
 Large-displacement stage-specific and cross-stage correctness jobs use 12 logarithmically spaced displacement magnitudes across $10^2\leq\delta\leq10^4$, with the deterministic angle sweep used by the benchmark harness. This is the prevalidated oracle grid for the strict reference-stability budget. The more expensive true end-to-end large-displacement benchmark uses four representative logarithmically spaced magnitudes spanning the same interval; its role is full-stack composition validation rather than repeating the denser stage-specific sweep. Standard-domain correctness and performance timing retain 32 displacement samples.
 
 The large-displacement cross-stage job exercises Simpson, GL4, FFTLog, and the private Ogata benchmark backend. Its correctness gate is safety-oriented: every emitted automatic certificate must pass the independent dense-field reference. Safe backend refusals are allowed, and automatically sampled HarmonicTransform inputs are additionally subjected to the production q-boundary robustness probe. Per-case coverage is reported separately so an unsupported upstream representation cannot be hidden by a backend self-convergence certificate.
+
+A dedicated practical-tier large-displacement pair of publication jobs complements the primary `1e-4` study. `interaction-large-practical-convergence` repeats the canonical four-case large-delta capability/certification matrix at `1e-3`, while `interaction-large-practical-performance` measures calibration and fixed-parameter production timing on the same cases and tolerance. The two outputs are kept separate because timing does not establish accuracy. Together they support workload-conditioned throughput and calibration-amortization claims without changing any numerical algorithm or search box.
 
 ## Canonical runs
 
@@ -47,6 +49,14 @@ Run all manuscript-grade benchmarks with the fixed single-thread policy:
 ```bash
 python -m benchmarks.run_suite publication
 ```
+
+Run only the practical-tier large-displacement extension after committing the benchmark-plan patch:
+
+```bash
+python -m benchmarks.run_suite publication --only interaction-large-practical-convergence,interaction-large-practical-performance
+```
+
+Subset runs write a separate `manifest_<job...>.json` and do not overwrite the canonical full-suite `manifest.json`.
 
 Run documentation checks:
 

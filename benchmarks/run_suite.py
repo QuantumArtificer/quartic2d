@@ -129,6 +129,42 @@ def _publication_jobs() -> tuple[Job, ...]:
             "Automatic-certification reliability, large-delta oracle stability, and method coverage.",
         ),
         Job(
+            "interaction-large-practical-convergence",
+            "publication",
+            "benchmarks.publication.interaction_convergence",
+            (
+                "--output", str(pub / "interaction_convergence_large_1e-3.json"),
+                "--harmonic-results", str(pub / "harmonic_transform.json"),
+                "--methods", "simpson,gl4,fftlog,ogata",
+                "--tolerances", "1e-3",
+                "--cases", "default",
+                "--delta-domains", "large",
+                "--n-delta-large", "12",
+                "--reference-order", "24",
+            ),
+            "Practical-tier large-displacement capability/certification comparison at 1e-3 on the canonical four-case matrix.",
+        ),
+        Job(
+            "interaction-large-practical-performance",
+            "publication",
+            "benchmarks.publication.autoconvergence_performance",
+            (
+                "--output", str(pub / "autoconvergence_performance_large_1e-3.json"),
+                "--harmonic-results", str(pub / "harmonic_transform.json"),
+                "--stages", "interaction",
+                "--interaction-cases", "default",
+                "--methods", "simpson,gl4,fftlog",
+                "--include-ogata",
+                "--tolerances", "1e-3",
+                "--delta-domains", "large",
+                "--n-delta", "12",
+                "--calibration-repeats", "5",
+                "--production-warmups", "2",
+                "--production-repeats", "9",
+            ),
+            "Practical-tier large-displacement calibration and fixed-parameter production timing at 1e-3 on the same canonical four-case matrix.",
+        ),
+        Job(
             "cross-stage-standard",
             "publication",
             "benchmarks.publication.cross_stage",
@@ -382,7 +418,11 @@ def main() -> None:
         )
 
     env = _single_thread_env()
-    manifest_path = RESULTS / args.profile / "manifest.json"
+    if args.only:
+        subset_name = "__".join(job.name for job in jobs)
+        manifest_path = RESULTS / args.profile / f"manifest_{subset_name}.json"
+    else:
+        manifest_path = RESULTS / args.profile / "manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest = {
         "schema": 1,
