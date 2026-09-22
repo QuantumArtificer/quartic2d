@@ -1,0 +1,1 @@
+publication benchmarks require a clean Git working tree. Commit/stash the intended source state first, or pass --allow-dirty explicitly.
