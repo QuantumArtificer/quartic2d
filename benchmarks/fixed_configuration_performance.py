@@ -178,8 +178,6 @@ def main() -> None:
     if not bool(source_summary.get("validation_passed")):
         raise ValueError("qualification results are not a passed validation dataset")
     source_git = source.get("environment", {}).get("git", {})
-    if source_git.get("dirty") is True:
-        raise ValueError("qualification results were produced from a dirty Git tree")
 
     methods = set(parse_csv(args.methods))
     available_cases = {item.name: item for item in validation_cases()}

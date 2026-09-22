@@ -29,26 +29,80 @@ def _git_output(*args: str) -> str | None:
 
 
 def git_metadata() -> dict:
-    """Return the exact repository state associated with a benchmark result."""
+    """Describe repository provenance without restricting benchmark execution.
+
+    A clean tree is exactly reproducible from ``commit``.  A dirty tree is still a
+    valid benchmark source state, but reproducing it requires both the commit and
+    the recorded working-tree changes.  Benchmark runners therefore *record* this
+    distinction rather than refusing to run.
+    """
     commit = _git_output("rev-parse", "HEAD")
     branch = _git_output("rev-parse", "--abbrev-ref", "HEAD")
-    status = _git_output("status", "--porcelain=v1", "--untracked-files=all")
-    dirty = None if status is None else bool(status)
+    try:
+        # Do not use ``_git_output`` here: its whitespace stripping would destroy
+        # the two-column porcelain status prefix (for example ``" M"``).
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+            cwd=ROOT,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).rstrip("\n")
+    except (OSError, subprocess.CalledProcessError):
+        status = None
+
+    if status is None:
+        return {
+            "commit": commit,
+            "branch": branch,
+            "dirty": None,
+            "source_state": "git_unavailable",
+            "reproducibility": "unknown",
+            "changed_paths": [],
+            "diff_sha256": None,
+        }
+
+    status_lines = [line for line in status.splitlines() if line.strip()]
+    dirty = bool(status_lines)
+    changed_paths = []
+    for line in status_lines:
+        code = line[:2]
+        path = line[3:] if len(line) > 3 else ""
+        changed_paths.append({"status": code, "path": path})
+
     diff_sha256 = None
     if dirty:
         try:
+            # ``git diff HEAD`` captures both staged and unstaged tracked changes.
+            # Include untracked file contents as well so the fingerprint describes
+            # the complete working-tree source state rather than only tracked edits.
+            hasher = hashlib.sha256()
             diff = subprocess.check_output(
                 ["git", "diff", "HEAD", "--binary"],
                 cwd=ROOT,
                 stderr=subprocess.DEVNULL,
             )
-            diff_sha256 = hashlib.sha256(diff).hexdigest()
+            hasher.update(diff)
+            untracked = _git_output("ls-files", "--others", "--exclude-standard")
+            for rel in sorted(untracked.splitlines() if untracked else []):
+                path = ROOT / rel
+                hasher.update(rel.encode("utf-8", errors="surrogateescape"))
+                hasher.update(b"\0")
+                try:
+                    hasher.update(path.read_bytes())
+                except OSError:
+                    hasher.update(b"<unreadable>")
+                hasher.update(b"\0")
+            diff_sha256 = hasher.hexdigest()
         except (OSError, subprocess.CalledProcessError):
             diff_sha256 = None
+
     return {
         "commit": commit,
         "branch": branch,
         "dirty": dirty,
+        "source_state": "working_tree_modified" if dirty else "exact_commit",
+        "reproducibility": "working_tree_dependent" if dirty else "exact_commit",
+        "changed_paths": changed_paths,
         "diff_sha256": diff_sha256,
     }
 

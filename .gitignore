@@ -20,6 +20,7 @@ docs/_build/
 
 # Generated validation / benchmark outputs
 benchmarks/results/
+/benchmarks_*.log
 
 # QUARTIC2D local development artifacts
 .quartic2d_backup_*/

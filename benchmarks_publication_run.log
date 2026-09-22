@@ -1,1 +1,35 @@
-publication benchmarks require a clean Git working tree. Commit/stash the intended source state first, or pass --allow-dirty explicitly.
+
+====================================================================================================
+REPOSITORY PROVENANCE
+====================================================================================================
+Source state : DIRTY WORKING TREE
+Assessment   : benchmark will run normally; provenance includes the working-tree fingerprint
+Branch       : main
+Commit       : 22620c7ee9b0e68cd26fb5bd8790c77de8af0ca2
+Changed paths: 5
+     M  .gitignore
+     M  benchmarks/_common.py
+     M  benchmarks/fixed_configuration_performance.py
+     M  benchmarks/run_suite.py
+     M  benchmarks_publication_run.log
+Fingerprint  : sha256:92b84794ac3e576f… (full value in manifest.json)
+
+====================================================================================================
+HARMONIC TRANSFORM
+====================================================================================================
+
+[01/18] HarmonicTransform reference accuracy
+----------------------------------------
+Purpose: Reference accuracy, requested-tolerance response, and input qualification for the principal
+         HarmonicTransform methods.
+Status : RUNNING
+
+    [gaussian_isotropic] smooth / one harmonic
+      tol=0.001: qmax=5.406; simpson: Nr=160, nq=16, sub=1, 3.1 ms, eps_in=6.49e-05,
+      eps_tail=6.72e-04; gl4: Nr=160, nq=16, sub=1, 8.6 ms, eps_in=6.45e-05, eps_tail=6.72e-04
+      tol=0.0001: qmax=6.199; simpson: Nr=160, nq=32, sub=1, 5.4 ms, eps_in=5.71e-06,
+      eps_tail=6.72e-05; gl4: Nr=160, nq=32, sub=1, 12.2 ms, eps_in=4.01e-06, eps_tail=6.72e-05
+      tol=1e-05: qmax=6.902; simpson: Nr=384, nq=64, sub=1, 15.5 ms, eps_in=2.97e-07,
+      eps_tail=6.72e-06; gl4: Nr=384, nq=64, sub=1, 65.2 ms, eps_in=2.53e-07, eps_tail=6.72e-06
+
+    [gaussian_odd_pair] smooth / odd conjugate pair

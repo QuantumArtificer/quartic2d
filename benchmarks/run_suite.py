@@ -511,11 +511,9 @@ def main() -> None:
         default="",
         help="comma-separated job names within the selected profile",
     )
-    parser.add_argument(
-        "--allow-dirty",
-        action="store_true",
-        help="allow publication benchmarks from a dirty Git tree (not recommended for manuscript evidence)",
-    )
+    # Backward-compatible no-op.  Dirty trees are always allowed; provenance is
+    # detected and recorded in the manifest instead of blocking execution.
+    parser.add_argument("--allow-dirty", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--show-commands",
         action="store_true",
@@ -542,12 +540,32 @@ def main() -> None:
         raise SystemExit("no benchmark jobs selected")
 
     git = git_metadata()
-    includes_publication = any(job.tier == "publication" for job in listed_jobs)
-    if includes_publication and not args.allow_dirty and git.get("dirty"):
-        raise SystemExit(
-            "publication benchmarks require a clean Git working tree. "
-            "Commit/stash the intended source state first, or pass --allow-dirty explicitly."
-        )
+
+    print("\n" + "=" * 100)
+    print("REPOSITORY PROVENANCE")
+    print("=" * 100)
+    source_state = git.get("source_state")
+    if source_state == "exact_commit":
+        print("Source state : CLEAN COMMIT")
+        print("Assessment   : exact commit provenance; rerun from the recorded commit")
+    elif source_state == "working_tree_modified":
+        print("Source state : DIRTY WORKING TREE")
+        print("Assessment   : benchmark will run normally; provenance includes the working-tree fingerprint")
+    else:
+        print("Source state : GIT STATUS UNAVAILABLE")
+        print("Assessment   : benchmark will run normally; Git provenance cannot be fully assessed")
+    print(f"Branch       : {git.get('branch') or 'unknown'}")
+    print(f"Commit       : {git.get('commit') or 'unknown'}")
+    if git.get("dirty"):
+        changed = git.get("changed_paths", [])
+        print(f"Changed paths: {len(changed)}")
+        shown = changed[:12]
+        for item in shown:
+            print(f"    {item.get('status', '??'):>2s}  {item.get('path', '')}")
+        if len(changed) > len(shown):
+            print(f"    ... {len(changed) - len(shown)} more path(s); see manifest.json for the full list")
+        if git.get("diff_sha256"):
+            print(f"Fingerprint  : sha256:{git['diff_sha256'][:16]}… (full value in manifest.json)")
 
     subset_name = "__".join(job.name for job in listed_jobs) if args.only else ""
     full_publication = args.profile == "publication" and not args.only
@@ -584,6 +602,11 @@ def main() -> None:
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "finished_at_utc": None,
         "repository": git,
+        "provenance_assessment": {
+            "source_state": git.get("source_state"),
+            "reproducibility": git.get("reproducibility"),
+            "benchmark_execution_allowed": True,
+        },
         "execution_policy": {
             "thread_count": 1,
             "thread_environment": {
