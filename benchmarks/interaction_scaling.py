@@ -14,7 +14,7 @@ import numpy as np
 from quartic2d import HarmonicTransform, Interaction
 
 from benchmarks._common import environment_metadata
-from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
+from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
 
 class FieldView:
     def __init__(self, source, modes=None, n_q=None):
@@ -118,7 +118,7 @@ def run_one(field1, field2, dxy, method, *, n=512, subdivisions=1, warmups=2, re
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/publication/interaction_scaling.json"))
+    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/interaction_scaling.json"))
     ap.add_argument("--warmups", type=int, default=2)
     ap.add_argument("--repeats", type=int, default=7)
     ap.add_argument("--quick", action="store_true", help="Reduced smoke-test ranges; not for paper results.")

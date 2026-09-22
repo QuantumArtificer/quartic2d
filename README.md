@@ -141,7 +141,7 @@ python -m pytest -q
 Run the lightweight analytic documentation check with
 
 ```bash
-python -m benchmarks.documentation.gaussian_validation --quick
+python -m benchmarks.gaussian_validation --quick
 ```
 
 The complete benchmark organization and manuscript evidence policy live in [`benchmarks/`](benchmarks/README.md). List the canonical manuscript-grade suite with
@@ -150,7 +150,7 @@ The complete benchmark organization and manuscript evidence policy live in [`ben
 python -m benchmarks.run_suite publication --list
 ```
 
-Generated benchmark output is written under `benchmarks/results/` and is not tracked. Historical frozen datasets live under `benchmarks/reference/`; they are not silently reused as current manuscript evidence.
+A full publication run writes a clean consolidated evidence set under `benchmarks/results/`: one manifest plus seven evidence JSON files: harmonic validation; Interaction accuracy; Interaction automatic convergence; pipeline validation; performance/reuse; runtime scaling; and memory scaling. Generated results are not tracked. Frozen benchmark datasets are published with release/Zenodo artifacts rather than retained in the source tree.
 
 ## Documentation
 

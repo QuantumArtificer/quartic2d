@@ -146,17 +146,17 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("benchmarks/results/publication/fixed_configuration_performance_large_1e-3.json"),
+        default=Path("benchmarks/results/fixed_configuration_performance_large_1e-3.json"),
     )
     parser.add_argument(
         "--qualification-results",
         type=Path,
-        default=Path("benchmarks/results/publication/interaction_convergence_large_1e-3.json"),
+        default=Path("benchmarks/results/interaction_convergence_large_1e-3.json"),
     )
     parser.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("benchmarks/results/publication/harmonic_transform.json"),
+        default=Path("benchmarks/results/harmonic_transform.json"),
     )
     parser.add_argument("--cases", default="default")
     parser.add_argument("--methods", default="simpson,gl4,fftlog,ogata")

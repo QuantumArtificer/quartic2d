@@ -16,7 +16,7 @@ import numpy as np
 from quartic2d import Interaction
 
 from benchmarks._common import environment_metadata
-from benchmarks.publication.interaction_scaling import FieldView, base_field, deltas, kernel
+from benchmarks.interaction_scaling import FieldView, base_field, deltas, kernel
 
 MIB = 1024.0**2
 MODES = {
@@ -72,7 +72,7 @@ def worker(args):
 
 def sample_one(*, method, n_p, n_d, n_f, n_q, s_q, poll_s):
     cmd = [
-        sys.executable, "-m", "benchmarks.publication.interaction_memory", "--worker",
+        sys.executable, "-m", "benchmarks.interaction_memory", "--worker",
         "--method", method,
         "--n-p", str(int(n_p)), "--n-d", str(int(n_d)),
         "--n-f", str(int(n_f)), "--n-q", str(int(n_q)), "--s-q", str(int(s_q)),
@@ -138,7 +138,7 @@ def point(axis, value, *, method, n_p, n_d, n_f, n_q, s_q, args):
 
 def main():
     ap=argparse.ArgumentParser()
-    ap.add_argument("--output",type=Path,default=Path("benchmarks/results/publication/interaction_memory.json"))
+    ap.add_argument("--output",type=Path,default=Path("benchmarks/results/interaction_memory.json"))
     ap.add_argument("--repeats",type=int,default=3)
     ap.add_argument("--poll-ms",type=float,default=1.0)
     ap.add_argument("--worker",action="store_true")

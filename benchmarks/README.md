@@ -1,86 +1,109 @@
 # QUARTIC2D benchmark suite
 
-All numerical benchmarking lives here. The suite is organized by **evidence role**, not by development chronology.
+The benchmark directory contains the reproducible numerical evidence used by the
+methods paper and release validation. Runners are intentionally kept in one flat
+namespace so the repository does not mirror development history in its folder tree.
 
-## Directory layout
+## Layout
 
-- `publication/` — manuscript-grade numerical experiments. These are the only runners from which paper claims may be taken directly.
-- `documentation/` — small analytic/workflow checks used to support documentation and examples. They are intentionally cheap and are not manuscript evidence.
-- `development/` — screening, profiling, parameter-search diagnostics, and legacy method studies. These may motivate changes but are never cited as final evidence.
-- `figures/` — plotting code and the shared publication style. Numerical runners never create paper figures implicitly.
-- `reference/` — frozen, versioned historical datasets. A reference dataset is immutable once archived and is never silently substituted for a current publication run.
-- `results/` — generated outputs. `results/publication/`, `results/documentation/`, and `results/development/` are ignored by Git.
-- `CLAIMS.md` — claim-to-evidence registry for the methods paper.
-- `FIGURES.md` — figure contract and manuscript/supplement allocation.
-- `COMPLEXITY.md` — source-derived complexity model used by scaling benchmarks.
-- `run_suite.py` — canonical benchmark launcher.
+- `run_suite.py` — canonical launcher for manuscript-grade and quick validation jobs.
+- `harmonic_*.py`, `interaction_*.py`, `cross_stage.py`, `end_to_end.py` — publication benchmark runners.
+- `autoconvergence_performance.py`, `fixed_configuration_performance.py` — calibration and fixed-production timing.
+- `gaussian_validation.py` — inexpensive analytic workflow validation used by CI/docs.
+- `manuscript_artifacts.py` — generates the manuscript/supplement figures and tables from canonical JSON results.
+- `_common.py`, `_interaction_suite.py` — shared benchmark infrastructure.
+- `CLAIMS.md` — numerical claim-to-evidence registry.
+- `FIGURES.md` — manuscript figure/table contract.
+- `COMPLEXITY.md` — source-derived complexity model.
+- `results/` — generated JSON and manuscript artifacts; ignored by Git.
 
-The benchmark suite is separate from unit tests. Unit tests protect implementation invariants; publication benchmarks establish accuracy, convergence, performance, scaling, and end-to-end claims against explicit references.
+Exploratory screens, profiling scripts, legacy plotting programs, and historical
+one-off regression matrices are intentionally excluded from the release source tree.
+They belong in development history or archived release artifacts, not in the package
+repository.
 
-## Evidence classes
+The benchmark suite is distinct from unit tests. Unit tests protect stable public
+and numerical behavior; benchmarks establish accuracy, convergence, performance,
+scaling, memory, and end-to-end claims against explicit references.
 
-Publication evidence is divided into four classes:
+## Evidence policy
 
-1. **Reference / validation / accuracy** — comparison with analytic or independently converged references. Input-representation error is reported separately from QUARTIC2D-controlled error.
-2. **Precision / convergence** — response to requested tolerance, standalone HarmonicTransform and Interaction automatic-certification reliability, difficult regimes, and conservative refusal.
-3. **Performance / complexity** — repeated wall time, automatic-convergence overhead, scaling, and peak memory. Performance runners do not make accuracy claims on their own.
-4. **Composition / end-to-end** — broad QUARTIC2D cross-stage tests start from qualified analytic radial harmonics, while true end-to-end tests start from sampled 2D functions and exercise `PETAL2D PolarDecomposition -> HarmonicTransform -> Interaction` against independent analytic-form-factor references.
+Publication results use global relative L2 error together with peak-normalized
+absolute error. Pointwise relative error near zeros is not used as a primary metric.
+Input-representation error is kept separate from QUARTIC2D-controlled numerical
+error.
 
-Pointwise relative error is not the primary metric near zeros. Publication runners use global relative L2 error together with peak-normalized absolute error, and explicitly separate q-tail error where applicable.
+The tolerance hierarchy is:
 
-The canonical tolerance hierarchy has three application roles rather than a single pass/fail ladder. `1e-3` is the practical/throughput tier for scans, fitting, optimization, and other workloads that do not require tighter numerical accuracy; `1e-4` is the primary publication validation target; and `1e-5` is a stringent limit/verification tier. Publication gating therefore requires the `1e-3` and `1e-4` HarmonicTransform rows to complete; `1e-5` limitations are retained in the canonical dataset and reported rather than silently discarded. Interaction results distinguish automatic certification from bounded backend capability so a fast method can be useful in a qualified operating regime without being presented as universally reliable.
+- `1e-3`: practical/throughput tier;
+- `1e-4`: primary publication target;
+- `1e-5`: stringent limit/verification tier.
 
-Large-displacement stage-specific and cross-stage correctness jobs use 12 logarithmically spaced displacement magnitudes across $10^2\leq\delta\leq10^4$, with the deterministic angle sweep used by the benchmark harness. This is the prevalidated oracle grid for the strict reference-stability budget. The more expensive true end-to-end large-displacement benchmark uses four representative logarithmically spaced magnitudes spanning the same interval; its role is full-stack composition validation rather than repeating the denser stage-specific sweep. Standard-domain correctness and performance timing retain 32 displacement samples.
+Large-displacement validation uses the predeclared range
+$10^2\leq\delta\leq10^4$. Cross-stage results distinguish backend refusal from the
+upstream `upstream_q_boundary_not_robust` safeguard; an unsupported upstream field
+is never converted into a successful Interaction certificate.
 
-The large-displacement cross-stage job exercises Simpson, GL4, FFTLog, and the public Ogata backend. Its correctness gate is safety-oriented: every emitted automatic certificate must pass the independent dense-field reference. Safe backend refusals are allowed, and automatically sampled HarmonicTransform inputs are additionally subjected to the production q-boundary robustness probe. Per-case coverage is reported separately so an unsupported upstream representation cannot be hidden by a backend self-convergence certificate.
+## Canonical commands
 
-A dedicated practical-tier large-displacement publication set complements the primary `1e-4` study. `interaction-large-practical-convergence` repeats the canonical four-case large-delta capability/certification matrix at `1e-3`; `interaction-large-practical-performance` measures automatic calibration and selected production timing on the same cases; and `interaction-large-qualified-fixed-performance` measures fixed production cost for every configuration already shown by the independent reference to satisfy `1e-3`, including conservative automatic refusals; finite rules use the minimum tested oracle-proven passing subdivision count, while other backends use a reference-passing terminal configuration when that is the only demonstrated fixed point. Accuracy and timing remain separate evidence classes.
-
-## Canonical runs
-
-List the suite without executing it:
+List the manuscript-grade suite in execution order:
 
 ```bash
-python -m benchmarks.run_suite --list
+python -m benchmarks.run_suite publication --list
 ```
 
-Run all manuscript-grade benchmarks with the fixed single-thread policy:
+Run the full publication suite with the fixed single-thread policy:
 
 ```bash
 python -m benchmarks.run_suite publication
 ```
 
-Run only the practical-tier large-displacement extension after committing the benchmark-plan patch:
+A full publication run begins by clearing the generated `benchmarks/results/`
+tree. Native runner JSON is written only to a temporary staging directory while
+the suite is running. After every benchmark passes, the staging data are promoted
+losslessly into the canonical result set:
 
-```bash
-python -m benchmarks.run_suite publication --only interaction-large-practical-convergence,interaction-large-practical-performance,interaction-large-qualified-fixed-performance
-```
+- `manifest.json` -- repository state, execution policy, grouped benchmark status,
+  elapsed times, and structured runner arguments;
+- `harmonic.json` -- HarmonicTransform accuracy, automatic convergence, and the
+  finite-quadrature method matrix;
+- `interaction_accuracy.json` -- Interaction reference accuracy, production timing, and the primary-tolerance public-method matrix;
+- `interaction_convergence.json` -- automatic-certification reliability and bounded capability at the primary and practical large-`delta` targets;
+- `pipeline.json` -- standard/large-`delta` cross-stage and true end-to-end
+  validation;
+- `performance.json` -- automatic-calibration cost and independently qualified
+  fixed-configuration production timing;
+- `scaling.json` -- HarmonicTransform and Interaction runtime scaling;
+- `memory.json` -- fresh-process peak-memory scaling.
 
-Subset runs write a separate `manifest_<job...>.json` and do not overwrite the canonical full-suite `manifest.json`.
+The numerical objects emitted by each runner are embedded unchanged under named
+`sections` in these files. Consolidation does not round, rename, or recompute any
+benchmark value. This makes the JSON easier to inspect while preserving exact
+figure/table inputs and provenance.
 
-Run documentation checks:
+Subset runs never overwrite the canonical result set. They are written under
+`benchmarks/results/subsets/<selection>/`.
+
+Run the inexpensive analytic workflow check separately with:
 
 ```bash
 python -m benchmarks.run_suite documentation
 ```
 
-Run development-only screens/profilers explicitly:
+Generate manuscript figures and tables from the consolidated publication JSON:
 
 ```bash
-python -m benchmarks.run_suite development
+python -m benchmarks.manuscript_artifacts
 ```
 
-`publication` is the canonical command for the final manuscript dataset. It refuses a dirty Git working tree by default and writes `results/publication/manifest.json` with the exact commit, commands, timestamps, and job status. Development outputs must never be promoted by copying or renaming them into `results/publication/`.
+The figure generator reads the named sections in the six evidence files above.
+Its numerical inputs are identical to the native runner objects used before result
+consolidation.
 
 ## Result promotion
 
-A manuscript/Zenodo reference snapshot is created only after:
-
-1. all publication runners complete;
-2. independent reference-stability checks pass;
-3. zero false-positive automatic certificates are observed;
-4. both cross-stage QUARTIC2D composition and true PETAL2D -> QUARTIC2D end-to-end benchmarks pass;
-5. environment metadata and the Git commit are recorded;
-6. numerically backed claims are extracted from the JSON outputs and cross-checked against `CLAIMS.md`.
-
-Only then should `results/publication/` be frozen into a versioned archive under `reference/` or the Zenodo artifact.
+A manuscript/Zenodo snapshot is created only after all required publication runners
+complete, independent reference-stability checks pass, no false-positive automatic
+certificates are observed, cross-stage and end-to-end validation pass, and the exact
+Git/environment metadata is recorded. Archived datasets should be stored with the
+release/Zenodo artifact rather than accumulated in the source tree.

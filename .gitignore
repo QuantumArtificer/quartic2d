@@ -19,8 +19,7 @@ env/
 docs/_build/
 
 # Generated validation / benchmark outputs
-benchmarks/results/*
-!benchmarks/results/.gitkeep
+benchmarks/results/
 
 # QUARTIC2D local development artifacts
 .quartic2d_backup_*/

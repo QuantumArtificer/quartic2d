@@ -39,7 +39,7 @@ from benchmarks._interaction_suite import (
     kernel_registry,
     validation_cases,
 )
-from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
+from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
 
 SUPPORTED_HARMONIC_METHODS = ("trapezoid", "simpson", "gl4", "gl8")
 SUPPORTED_INTERACTION_METHODS = FINITE_METHODS + ("fftlog", "ogata")
@@ -704,18 +704,18 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("benchmarks/results/publication/autoconvergence_performance.json"),
+        default=Path("benchmarks/results/autoconvergence_performance.json"),
     )
     parser.add_argument(
         "--profile-dir",
         type=Path,
-        default=Path("benchmarks/results/development/profiles/autoconvergence"),
+        default=Path("benchmarks/results/profiles/autoconvergence"),
     )
     parser.add_argument("--stages", default="harmonic,interaction")
     parser.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("benchmarks/results/publication/harmonic_transform.json"),
+        default=Path("benchmarks/results/harmonic_transform.json"),
     )
     parser.add_argument("--harmonic-workloads", default="default")
     parser.add_argument("--interaction-cases", default="default")

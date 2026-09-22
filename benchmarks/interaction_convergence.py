@@ -130,13 +130,13 @@ def main():
     ap.add_argument(
         "--output",
         type=Path,
-        default=Path("benchmarks/results/publication/interaction_convergence.json"),
+        default=Path("benchmarks/results/interaction_convergence.json"),
     )
     ap.add_argument("--methods", default="simpson,gl4,fftlog,ogata")
     ap.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("benchmarks/results/publication/harmonic_transform.json"),
+        default=Path("benchmarks/results/harmonic_transform.json"),
     )
     ap.add_argument("--upstream-target", type=float, default=1.0e-4)
     ap.add_argument("--upstream-method", default="simpson")

@@ -20,7 +20,7 @@ from scipy.special import jv
 from quartic2d import HarmonicTransform, Interaction
 from quartic2d._numerics import common_grid
 
-from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
+from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
 
 FINITE_METHODS = ("trapezoid", "simpson", "gl4", "gl8")
 ALL_METHODS = FINITE_METHODS + ("ogata", "fftlog")

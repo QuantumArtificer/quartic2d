@@ -25,7 +25,7 @@ import numpy as np
 
 from quartic2d import HarmonicTransform
 from benchmarks._common import environment_metadata
-from benchmarks.publication.harmonic_transform import (
+from benchmarks.harmonic_transform import (
     SyntheticDecomposition,
     q_tail_l2_analytic,
     signed_exact,
@@ -88,7 +88,7 @@ def write(path: Path, data: dict) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/publication/harmonic_convergence.json"))
+    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/harmonic_convergence.json"))
     ap.add_argument("--methods", default="simpson,gl4")
     ap.add_argument("--rtol", type=float, default=1.0e-4)
     ap.add_argument("--atol", type=float, default=1.0e-12)

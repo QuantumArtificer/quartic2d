@@ -10,6 +10,5 @@ recursive-include benchmarks *.py *.md
 recursive-include tests *.py
 recursive-include docs *.md *.rst *.py Makefile
 prune benchmarks/results
-prune benchmarks/reference
 prune docs/_build
 global-exclude __pycache__ *.py[cod] .DS_Store

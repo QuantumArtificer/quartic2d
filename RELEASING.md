@@ -11,7 +11,7 @@ Clean generated artifacts and run the release checks:
 ```bash
 python tools/clean_generated.py
 python -m pytest -q
-python -m benchmarks.documentation.gaussian_validation --quick
+python -m benchmarks.gaussian_validation --quick
 python -m sphinx -W --keep-going -b html docs/source docs/_build/html
 python -m build
 python -m twine check dist/*

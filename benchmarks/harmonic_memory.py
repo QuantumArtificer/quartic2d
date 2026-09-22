@@ -99,7 +99,7 @@ def sample_one(*, n_r, n_q, n_m, subdivisions, r_max, q_max, poll_seconds):
     cmd = [
         sys.executable,
         "-m",
-        "benchmarks.publication.harmonic_memory",
+        "benchmarks.harmonic_memory",
         "--worker",
         "--n-r", str(int(n_r)),
         "--n-q", str(int(n_q)),
@@ -359,7 +359,7 @@ def run(args) -> dict:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", default="benchmarks/results/publication/harmonic_memory.json")
+    parser.add_argument("--output", default="benchmarks/results/harmonic_memory.json")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--poll-ms", type=float, default=1.0)
     parser.add_argument("--base-nr", type=int, default=1024)

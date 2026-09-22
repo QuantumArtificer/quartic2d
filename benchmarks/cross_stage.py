@@ -28,7 +28,7 @@ if str(HERE) not in sys.path:
 
 from quartic2d import HarmonicTransform
 from benchmarks._common import environment_metadata
-from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
+from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
 from benchmarks._interaction_suite import (
     DEFAULT_SUBDIVISIONS,
     FFTLOG_BIAS_VALUES_LARGE,
@@ -55,7 +55,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument(
         "--harmonic-results",
-        default="benchmarks/results/publication/harmonic_transform.json",
+        default="benchmarks/results/harmonic_transform.json",
         help="canonical dense HarmonicTransform benchmark used as the cross-stage reference",
     )
     ap.add_argument("--upstream-target", type=float, default=1.0e-4)
@@ -76,7 +76,7 @@ def main():
     ap.add_argument("--large-reference-max-levels", type=int, default=4)
     ap.add_argument(
         "--output",
-        default="benchmarks/results/publication/cross_stage_1e-4.json",
+        default="benchmarks/results/cross_stage_1e-4.json",
     )
     args = ap.parse_args()
 

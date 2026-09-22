@@ -296,7 +296,7 @@ def run(args):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--output", default="benchmarks/results/publication/harmonic_scaling.json")
+    ap.add_argument("--output", default="benchmarks/results/harmonic_scaling.json")
     ap.add_argument("--warmups", type=int, default=2)
     ap.add_argument("--repeats", type=int, default=7)
     ap.add_argument("--base-nr", type=int, default=256)

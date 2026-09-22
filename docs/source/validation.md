@@ -25,7 +25,7 @@ $$
 Run the CI-sized validation with
 
 ```bash
-python -m benchmarks.documentation.gaussian_validation --quick
+python -m benchmarks.gaussian_validation --quick
 ```
 
 ## Unit tests
@@ -64,7 +64,7 @@ and run the complete canonical dataset with
 python -m benchmarks.run_suite publication
 ```
 
-The evidence policy and claim registry are documented in `benchmarks/README.md` and `benchmarks/CLAIMS.md`. Historical datasets under `benchmarks/reference/` are immutable release/archive artifacts rather than substitutes for a current run.
+The evidence policy and claim registry are documented in `benchmarks/README.md` and `benchmarks/CLAIMS.md`. Frozen release datasets are archival evidence and are never substituted for a current benchmark run.
 
 ## Interpreting convergence
 

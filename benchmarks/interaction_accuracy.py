@@ -133,11 +133,11 @@ def summarize_groups(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/publication/interaction_accuracy.json"))
+    ap.add_argument("--output", type=Path, default=Path("benchmarks/results/interaction_accuracy.json"))
     ap.add_argument(
         "--harmonic-results",
         type=Path,
-        default=Path("benchmarks/results/publication/harmonic_transform.json"),
+        default=Path("benchmarks/results/harmonic_transform.json"),
         help="completed HarmonicTransform benchmark used to reconstruct the fixed q-space fields",
     )
     ap.add_argument("--upstream-target", type=float, default=1.0e-4)

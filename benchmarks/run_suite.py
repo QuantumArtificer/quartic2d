@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Canonical QUARTIC2D benchmark launcher.
 
-The launcher separates manuscript-grade evidence from documentation and
-engineering/development diagnostics. Publication commands use fixed arguments so
-that the final dataset is reproducible and auditable.
+The launcher separates manuscript-grade evidence from the lightweight documentation
+validation. Publication commands use fixed arguments so the final dataset is
+reproducible and auditable.
 """
 from __future__ import annotations
 
@@ -11,13 +11,17 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import shutil
 import subprocess
 import sys
+import textwrap
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from benchmarks._common import git_metadata
+from benchmarks._common import git_metadata, write_json
+from benchmarks._results import consolidate_publication_results, remove_staging_directory
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "benchmarks" / "results"
@@ -32,13 +36,13 @@ class Job:
     purpose: str
 
 
-def _publication_jobs() -> tuple[Job, ...]:
-    pub = RESULTS / "publication"
+def _publication_jobs(result_dir: Path = RESULTS) -> tuple[Job, ...]:
+    pub = Path(result_dir)
     return (
         Job(
             "harmonic-transform",
             "publication",
-            "benchmarks.publication.harmonic_transform",
+            "benchmarks.harmonic_transform",
             (
                 "--output", str(pub / "harmonic_transform.json"),
                 "--tolerances", "1e-3,1e-4,1e-5",
@@ -53,7 +57,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "harmonic-autoconvergence",
             "publication",
-            "benchmarks.publication.harmonic_convergence",
+            "benchmarks.harmonic_convergence",
             (
                 "--output", str(pub / "harmonic_convergence_1e-4.json"),
                 "--methods", "simpson,gl4",
@@ -67,7 +71,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "harmonic-method-matrix",
             "publication",
-            "benchmarks.publication.harmonic_transform",
+            "benchmarks.harmonic_transform",
             (
                 "--output", str(pub / "harmonic_method_matrix_1e-4.json"),
                 "--tolerances", "1e-4",
@@ -80,7 +84,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "interaction-accuracy",
             "publication",
-            "benchmarks.publication.interaction_accuracy",
+            "benchmarks.interaction_accuracy",
             (
                 "--output", str(pub / "interaction_accuracy.json"),
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
@@ -97,7 +101,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "interaction-method-matrix",
             "publication",
-            "benchmarks.publication.interaction_accuracy",
+            "benchmarks.interaction_accuracy",
             (
                 "--output", str(pub / "interaction_method_matrix_1e-4.json"),
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
@@ -114,7 +118,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "interaction-convergence",
             "publication",
-            "benchmarks.publication.interaction_convergence",
+            "benchmarks.interaction_convergence",
             (
                 "--output", str(pub / "interaction_convergence.json"),
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
@@ -131,7 +135,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "interaction-large-practical-convergence",
             "publication",
-            "benchmarks.publication.interaction_convergence",
+            "benchmarks.interaction_convergence",
             (
                 "--output", str(pub / "interaction_convergence_large_1e-3.json"),
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
@@ -147,7 +151,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "interaction-large-practical-performance",
             "publication",
-            "benchmarks.publication.autoconvergence_performance",
+            "benchmarks.autoconvergence_performance",
             (
                 "--output", str(pub / "autoconvergence_performance_large_1e-3.json"),
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
@@ -166,7 +170,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "interaction-large-qualified-fixed-performance",
             "publication",
-            "benchmarks.publication.fixed_configuration_performance",
+            "benchmarks.fixed_configuration_performance",
             (
                 "--output", str(pub / "fixed_configuration_performance_large_1e-3.json"),
                 "--qualification-results", str(pub / "interaction_convergence_large_1e-3.json"),
@@ -183,7 +187,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "cross-stage-standard",
             "publication",
-            "benchmarks.publication.cross_stage",
+            "benchmarks.cross_stage",
             (
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
                 "--harmonic-rtol", "1e-4",
@@ -201,7 +205,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "cross-stage-large",
             "publication",
-            "benchmarks.publication.cross_stage",
+            "benchmarks.cross_stage",
             (
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
                 "--harmonic-rtol", "1e-4",
@@ -221,7 +225,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "end-to-end-standard",
             "publication",
-            "benchmarks.publication.end_to_end",
+            "benchmarks.end_to_end",
             (
                 "--cases", "gaussian_coulomb,anisotropic_rk_strong,nodal_rpa",
                 "--delta-domain", "standard",
@@ -240,7 +244,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "end-to-end-large",
             "publication",
-            "benchmarks.publication.end_to_end",
+            "benchmarks.end_to_end",
             (
                 "--cases", "gaussian_coulomb,anisotropic_rk_strong,nodal_rpa",
                 "--delta-domain", "large",
@@ -259,7 +263,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "autoconvergence-performance",
             "publication",
-            "benchmarks.publication.autoconvergence_performance",
+            "benchmarks.autoconvergence_performance",
             (
                 "--output", str(pub / "autoconvergence_performance.json"),
                 "--harmonic-results", str(pub / "harmonic_transform.json"),
@@ -277,7 +281,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "harmonic-scaling",
             "publication",
-            "benchmarks.publication.harmonic_scaling",
+            "benchmarks.harmonic_scaling",
             (
                 "--output", str(pub / "harmonic_scaling.json"),
                 "--warmups", "2",
@@ -288,7 +292,7 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "interaction-scaling",
             "publication",
-            "benchmarks.publication.interaction_scaling",
+            "benchmarks.interaction_scaling",
             (
                 "--output", str(pub / "interaction_scaling.json"),
                 "--warmups", "2",
@@ -299,82 +303,104 @@ def _publication_jobs() -> tuple[Job, ...]:
         Job(
             "harmonic-memory",
             "publication",
-            "benchmarks.publication.harmonic_memory",
+            "benchmarks.harmonic_memory",
             ("--output", str(pub / "harmonic_memory.json"), "--repeats", "3"),
             "Peak-memory scaling for HarmonicTransform.",
         ),
         Job(
             "interaction-memory",
             "publication",
-            "benchmarks.publication.interaction_memory",
+            "benchmarks.interaction_memory",
             ("--output", str(pub / "interaction_memory.json"), "--repeats", "3"),
             "Peak-memory scaling for Interaction.",
         ),
     )
 
 
-def _documentation_jobs() -> tuple[Job, ...]:
-    docs = RESULTS / "documentation"
+def _documentation_jobs(result_dir: Path = RESULTS) -> tuple[Job, ...]:
+    docs = Path(result_dir)
     return (
         Job(
             "gaussian-workflow",
             "documentation",
-            "benchmarks.documentation.gaussian_validation",
-            ("--quick", "--output", str(docs / "gaussian.json")),
+            "benchmarks.gaussian_validation",
+            ("--quick", "--output", str(docs / "gaussian_validation.json")),
             "Cheap analytic workflow check used by documentation/examples; not paper evidence.",
         ),
     )
 
 
-def _development_jobs() -> tuple[Job, ...]:
-    dev = RESULTS / "development"
-    pub = RESULTS / "publication"
-    return (
-        Job(
-            "legacy-backend-matrix",
-            "development",
-            "benchmarks.development.backend_matrix",
-            ("--quick", "--output-dir", str(dev / "legacy_backend_matrix")),
-            "Historical engineering matrix retained for regression/context; not current manuscript evidence.",
-        ),
-        Job(
-            "q-sampling-diagnostics",
-            "development",
-            "benchmarks.development.q_sampling",
-            ("--output", str(dev / "q_sampling.json")),
-            "Sampling-theory diagnostic retained for engineering regression and investigation.",
-        ),
-        Job(
-            "autoconvergence-screen",
-            "development",
-            "benchmarks.development.autoconvergence_screen",
-            (
-                "--output", str(dev / "autoconvergence_screen.json"),
-                "--harmonic-results", str(pub / "harmonic_transform.json"),
-            ),
-            "One-shot method screen; never publication timing evidence.",
-        ),
-        Job(
-            "autoconvergence-profile",
-            "development",
-            "benchmarks.development.autoconvergence_profile",
-            (
-                "--output", str(dev / "autoconvergence_profile.json"),
-                "--harmonic-results", str(pub / "harmonic_transform.json"),
-                "--profile-dir", str(dev / "profiles" / "autoconvergence"),
-            ),
-            "cProfile hotspot diagnostics; never publication timing evidence.",
-        ),
-    )
+
+JOB_GROUPS = {
+    "harmonic-transform": "Harmonic transform",
+    "harmonic-autoconvergence": "Harmonic transform",
+    "harmonic-method-matrix": "Harmonic transform",
+    "interaction-accuracy": "Interaction",
+    "interaction-method-matrix": "Interaction",
+    "interaction-convergence": "Interaction",
+    "interaction-large-practical-convergence": "Interaction",
+    "interaction-large-practical-performance": "Performance and reuse",
+    "interaction-large-qualified-fixed-performance": "Performance and reuse",
+    "autoconvergence-performance": "Performance and reuse",
+    "cross-stage-standard": "Pipeline validation",
+    "cross-stage-large": "Pipeline validation",
+    "end-to-end-standard": "Pipeline validation",
+    "end-to-end-large": "Pipeline validation",
+    "harmonic-scaling": "Computational scaling",
+    "interaction-scaling": "Computational scaling",
+    "harmonic-memory": "Peak-memory scaling",
+    "interaction-memory": "Peak-memory scaling",
+    "gaussian-workflow": "Documentation validation",
+}
+
+JOB_TITLES = {
+    "harmonic-transform": "HarmonicTransform reference accuracy",
+    "harmonic-autoconvergence": "HarmonicTransform automatic convergence",
+    "harmonic-method-matrix": "HarmonicTransform finite-quadrature matrix",
+    "interaction-accuracy": "Interaction reference accuracy",
+    "interaction-method-matrix": "Interaction method matrix",
+    "interaction-convergence": "Interaction automatic convergence",
+    "interaction-large-practical-convergence": "Large-δ practical convergence",
+    "interaction-large-practical-performance": "Large-δ automatic-convergence cost",
+    "interaction-large-qualified-fixed-performance": "Large-δ qualified production timing",
+    "autoconvergence-performance": "Automatic-convergence performance",
+    "cross-stage-standard": "Cross-stage validation: standard δ",
+    "cross-stage-large": "Cross-stage validation: large δ",
+    "end-to-end-standard": "End-to-end validation: standard δ",
+    "end-to-end-large": "End-to-end validation: large δ",
+    "harmonic-scaling": "HarmonicTransform runtime scaling",
+    "interaction-scaling": "Interaction runtime scaling",
+    "harmonic-memory": "HarmonicTransform peak-memory scaling",
+    "interaction-memory": "Interaction peak-memory scaling",
+    "gaussian-workflow": "Gaussian workflow validation",
+}
+
+GROUP_ORDER = {
+    "Harmonic transform": 0,
+    "Interaction": 1,
+    "Performance and reuse": 2,
+    "Pipeline validation": 3,
+    "Computational scaling": 4,
+    "Peak-memory scaling": 5,
+    "Documentation validation": 6,
+}
 
 
-JOBS = _publication_jobs() + _documentation_jobs() + _development_jobs()
+def _jobs_for_profile(profile: str, result_dir: Path = RESULTS) -> list[Job]:
+    jobs = list(_publication_jobs(result_dir) + _documentation_jobs(result_dir))
+    if profile != "all":
+        jobs = [job for job in jobs if job.tier == profile]
+    original_order = {job.name: index for index, job in enumerate(jobs)}
+    jobs.sort(key=lambda job: (GROUP_ORDER.get(JOB_GROUPS.get(job.name, ""), 99), original_order[job.name]))
+    return jobs
 
 
-def _jobs_for_profile(profile: str) -> list[Job]:
-    if profile == "all":
-        return list(JOBS)
-    return [job for job in JOBS if job.tier == profile]
+def _job_group(job: Job) -> str:
+    return JOB_GROUPS.get(job.name, job.tier.replace("_", " ").title())
+
+
+def _human_name(job: Job) -> str:
+    return JOB_TITLES.get(job.name, job.name.replace("-", " ").title())
 
 
 def _single_thread_env() -> dict[str, str]:
@@ -385,16 +411,98 @@ def _single_thread_env() -> dict[str, str]:
 
 
 def _print_jobs(jobs: Iterable[Job]) -> None:
+    current_group = None
     for job in jobs:
-        print(f"{job.tier:13s} {job.name:30s} {job.purpose}")
+        group = _job_group(job)
+        if group != current_group:
+            if current_group is not None:
+                print()
+            print(group)
+            print("-" * len(group))
+            current_group = group
+        print(f"  {_human_name(job)}")
+        print(textwrap.fill(job.purpose, width=92, initial_indent="    ", subsequent_indent="    "))
+
+
+def _structured_arguments(args: tuple[str, ...]) -> dict[str, object]:
+    """Represent argparse-style arguments as readable JSON fields."""
+    out: dict[str, object] = {}
+    i = 0
+    while i < len(args):
+        item = args[i]
+        if not item.startswith("--"):
+            out.setdefault("positional", []).append(item)
+            i += 1
+            continue
+        key = item[2:].replace("-", "_")
+        if i + 1 < len(args) and not args[i + 1].startswith("--"):
+            out[key] = args[i + 1]
+            i += 2
+        else:
+            out[key] = True
+            i += 1
+    return out
+
+
+def _format_elapsed(seconds: float) -> str:
+    if seconds < 60:
+        return f"{seconds:.1f} s"
+    minutes, sec = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{int(minutes)} min {sec:04.1f} s"
+    hours, minutes = divmod(int(minutes), 60)
+    return f"{hours} h {minutes:02d} min"
+
+
+def _stream_job(cmd: list[str], *, env: dict[str, str], width: int = 100) -> int:
+    """Run one benchmark while wrapping unusually long terminal lines."""
+    proc = subprocess.Popen(
+        cmd,
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for raw in proc.stdout:
+        line = raw.rstrip("\n")
+        if not line:
+            print()
+            continue
+        if len(line) <= width:
+            print(f"    {line}", flush=True)
+        else:
+            print(
+                textwrap.fill(
+                    line,
+                    width=width,
+                    initial_indent="    ",
+                    subsequent_indent="      ",
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                ),
+                flush=True,
+            )
+    return int(proc.wait())
+
+
+def _clean_previous_publication_outputs() -> None:
+    """Start a full publication rerun from an empty generated-results tree."""
+    if RESULTS.exists():
+        shutil.rmtree(RESULTS)
+    RESULTS.mkdir(parents=True, exist_ok=True)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Run the canonical QUARTIC2D benchmark suite and promote a consolidated result set."
+    )
     parser.add_argument(
         "profile",
         nargs="?",
-        choices=("publication", "documentation", "development", "all"),
+        choices=("publication", "documentation", "all"),
         default="publication",
     )
     parser.add_argument("--list", action="store_true", help="list jobs without executing them")
@@ -408,84 +516,176 @@ def main() -> None:
         action="store_true",
         help="allow publication benchmarks from a dirty Git tree (not recommended for manuscript evidence)",
     )
+    parser.add_argument(
+        "--show-commands",
+        action="store_true",
+        help="print the complete Python command for each runner",
+    )
     args = parser.parse_args()
 
-    jobs = _jobs_for_profile(args.profile)
+    # Use a placeholder result location for listing/filtering. Execution jobs are
+    # rebuilt below with their actual staging directory.
+    listed_jobs = _jobs_for_profile(args.profile, RESULTS / ".work" / "list")
+    wanted: set[str] = set()
     if args.only:
         wanted = {item.strip() for item in args.only.split(",") if item.strip()}
-        available = {job.name for job in jobs}
+        available = {job.name for job in listed_jobs}
         unknown = sorted(wanted - available)
         if unknown:
             raise SystemExit(f"unknown jobs for profile {args.profile!r}: {unknown}")
-        jobs = [job for job in jobs if job.name in wanted]
+        listed_jobs = [job for job in listed_jobs if job.name in wanted]
 
     if args.list:
-        _print_jobs(jobs)
+        _print_jobs(listed_jobs)
         return
-
-    if not jobs:
+    if not listed_jobs:
         raise SystemExit("no benchmark jobs selected")
 
     git = git_metadata()
-    if args.profile == "publication" and not args.allow_dirty and git.get("dirty"):
+    includes_publication = any(job.tier == "publication" for job in listed_jobs)
+    if includes_publication and not args.allow_dirty and git.get("dirty"):
         raise SystemExit(
             "publication benchmarks require a clean Git working tree. "
             "Commit/stash the intended source state first, or pass --allow-dirty explicitly."
         )
 
-    env = _single_thread_env()
-    if args.only:
-        subset_name = "__".join(job.name for job in jobs)
-        manifest_path = RESULTS / args.profile / f"manifest_{subset_name}.json"
+    subset_name = "__".join(job.name for job in listed_jobs) if args.only else ""
+    full_publication = args.profile == "publication" and not args.only
+    if full_publication:
+        final_dir = RESULTS
+        staging_dir = RESULTS / ".work" / "publication"
+        manifest_path = RESULTS / "manifest.json"
+        _clean_previous_publication_outputs()
+    elif args.profile == "documentation" and not args.only:
+        final_dir = RESULTS / "documentation"
+        staging_dir = final_dir / ".work"
+        manifest_path = final_dir / "manifest.json"
     else:
-        manifest_path = RESULTS / args.profile / "manifest.json"
+        label = subset_name or args.profile
+        final_dir = RESULTS / "subsets" / label
+        staging_dir = final_dir / ".work"
+        manifest_path = final_dir / "manifest.json"
+
+    if staging_dir.exists():
+        remove_staging_directory(staging_dir)
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
+    jobs = _jobs_for_profile(args.profile, staging_dir)
+    if wanted:
+        jobs = [job for job in jobs if job.name in wanted]
+
+    env = _single_thread_env()
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema": 1,
+        "schema_version": 2,
+        "result_type": "benchmark_run_manifest",
         "profile": args.profile,
+        "selection": "full" if not args.only else "subset",
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "finished_at_utc": None,
-        "git": git,
-        "thread_environment": {
-            key: env.get(key)
-            for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")
+        "repository": git,
+        "execution_policy": {
+            "thread_count": 1,
+            "thread_environment": {
+                key: env.get(key)
+                for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")
+            },
         },
-        "jobs": [],
-        "complete": False,
+        "benchmark_groups": [],
+        "consolidated_outputs": [],
+        "status": "running",
     }
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    write_json(manifest_path, manifest)
 
-    for job in jobs:
-        print(f"\n=== {job.tier}: {job.name} ===", flush=True)
+    current_group = None
+    group_record = None
+    total = len(jobs)
+    for index, job in enumerate(jobs, start=1):
+        group = _job_group(job)
+        if group != current_group:
+            current_group = group
+            group_record = {"name": group, "benchmarks": []}
+            manifest["benchmark_groups"].append(group_record)
+            print("\n" + "=" * 100)
+            print(group.upper())
+            print("=" * 100)
+
+        print(f"\n[{index:02d}/{total:02d}] {_human_name(job)}")
+        print("-" * min(100, max(36, len(_human_name(job)) + 4)))
+        print(textwrap.fill(job.purpose, width=100, initial_indent="Purpose: ", subsequent_indent="         "))
+        if args.show_commands:
+            command_text = " ".join([sys.executable, "-m", job.module, *job.args])
+            print(textwrap.fill(command_text, width=100, initial_indent="Command: ", subsequent_indent="         ", break_long_words=False))
+        print("Status : RUNNING", flush=True)
+
         cmd = [sys.executable, "-m", job.module, *job.args]
-        print("$ " + " ".join(cmd), flush=True)
         record = {
             "name": job.name,
-            "tier": job.tier,
+            "title": _human_name(job),
             "module": job.module,
-            "args": list(job.args),
             "purpose": job.purpose,
-            "command": cmd,
+            "arguments": _structured_arguments(job.args),
             "started_at_utc": datetime.now(timezone.utc).isoformat(),
             "finished_at_utc": None,
-            "returncode": None,
+            "elapsed_seconds": None,
+            "return_code": None,
             "status": "running",
         }
-        manifest["jobs"].append(record)
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+        assert group_record is not None
+        group_record["benchmarks"].append(record)
+        write_json(manifest_path, manifest)
+
+        t0 = time.perf_counter()
         try:
-            completed = subprocess.run(cmd, cwd=ROOT, env=env, check=False)
-            record["returncode"] = int(completed.returncode)
-            record["status"] = "passed" if completed.returncode == 0 else "failed"
+            return_code = _stream_job(cmd, env=env)
+            record["return_code"] = return_code
+            record["status"] = "passed" if return_code == 0 else "failed"
         finally:
+            elapsed = time.perf_counter() - t0
+            record["elapsed_seconds"] = float(elapsed)
             record["finished_at_utc"] = datetime.now(timezone.utc).isoformat()
-            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
-        if record["returncode"] != 0:
-            raise SystemExit(record["returncode"])
+            write_json(manifest_path, manifest)
+
+        label = "PASS" if record["status"] == "passed" else "FAIL"
+        print(f"Status : {label} ({_format_elapsed(elapsed)})", flush=True)
+        if record["return_code"] != 0:
+            print(f"Native result staging was preserved at: {staging_dir}")
+            raise SystemExit(record["return_code"])
+
+    if full_publication:
+        outputs = consolidate_publication_results(staging_dir, final_dir, require_complete=True)
+        manifest["consolidated_outputs"] = [path.name for path in outputs]
+        remove_staging_directory(staging_dir)
+    elif args.profile == "documentation" and not args.only:
+        # The documentation profile has one intentionally lightweight result.
+        source = staging_dir / "gaussian_validation.json"
+        target = final_dir / "gaussian_validation.json"
+        if source.exists():
+            target.write_bytes(source.read_bytes())
+            manifest["consolidated_outputs"] = [target.name]
+        remove_staging_directory(staging_dir)
+    else:
+        # Subsets are diagnostic runs. Keep their native JSON together with the
+        # manifest rather than overwriting the canonical full-suite evidence.
+        native_dir = final_dir / "native_results"
+        if native_dir.exists():
+            remove_staging_directory(native_dir)
+        staging_dir.rename(native_dir)
+        manifest["consolidated_outputs"] = [str(path.relative_to(final_dir)) for path in sorted(native_dir.glob("*.json"))]
 
     manifest["finished_at_utc"] = datetime.now(timezone.utc).isoformat()
-    manifest["complete"] = True
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    manifest["status"] = "passed"
+    write_json(manifest_path, manifest)
+
+    print("\n" + "=" * 100)
+    print("BENCHMARK SUITE COMPLETE")
+    print("=" * 100)
+    print(f"Status  : PASS")
+    print(f"Results : {final_dir}")
+    if manifest["consolidated_outputs"]:
+        print("Files   :")
+        for filename in manifest["consolidated_outputs"]:
+            print(f"  - {filename}")
 
 
 if __name__ == "__main__":

@@ -14,7 +14,6 @@ TARGETS = [
     ROOT / "dist",
     ROOT / "docs" / "_build",
     ROOT / "benchmarks" / "results",
-    ROOT / "paper" / "benchmarks",
     ROOT / "validation",
 ]
 

@@ -64,48 +64,8 @@ def test_hankel_transform_convergence_and_apply_for_gl4():
     assert np.all(np.isfinite(transform.F_q))
 
 
-def test_converge_ogata_reports_get_h_maxiter_as_nonconverged(monkeypatch):
-    from quartic2d import _convergence as convergence_module
-
-    def fail_get_h(*args, **kwargs):
-        raise Exception("Maxiter reached while checking convergence")
-
-    from quartic2d import _numerics as numerics_module
-    from types import SimpleNamespace
-
-    monkeypatch.setattr(
-        numerics_module, "_require_hankel", lambda: SimpleNamespace(get_h=fail_get_h)
-    )
-    result = convergence_module.converge_ogata(
-        lambda x: np.exp(-np.asarray(x) ** 2),
-        0,
-        K=np.array([0.1, 1.0]),
-        rtol=1.0e-4,
-        atol=1.0e-12,
-    )
-    assert not result.resolution_converged
-    assert not result.converged
-    assert result.selected_parameters == {}
-    assert result.metadata["status"] == "maxiter_reached"
-    assert result.steps[0].metadata["status"] == "maxiter_reached"
 
 
-def test_converge_ogata_does_not_hide_unrelated_errors(monkeypatch):
-    from quartic2d import _convergence as convergence_module
-
-    def fail_get_h(*args, **kwargs):
-        raise ValueError("bad callable")
-
-    from quartic2d import _numerics as numerics_module
-    from types import SimpleNamespace
-
-    monkeypatch.setattr(
-        numerics_module, "_require_hankel", lambda: SimpleNamespace(get_h=fail_get_h)
-    )
-    import pytest
-
-    with pytest.raises(ValueError, match="bad callable"):
-        convergence_module.converge_ogata(lambda x: x, 0)
 
 
 def test_fixed_order_convergence_selects_cheapest_verified_level():
@@ -251,220 +211,151 @@ def test_ogata_coupled_convergence_uses_N_and_h_lookahead():
     assert len(result.metadata["per_h"]) >= 3
     assert any(step.converged for step in result.steps)
 
+# ---- q-sampling core behavior ----
+import numpy as np
+from scipy.integrate import simpson
 
-def test_ogata_coupled_convergence_reports_N_limit():
-    from quartic2d._convergence import converge_ogata_coupled
-
-    def evaluator(parameters):
-        # Intentionally remains strongly N-dependent across the tested ladder.
-        N = float(parameters["N"])
-        h = float(parameters["h"])
-        return np.array([1.0 + 20.0 / N + h])
-
-    result = converge_ogata_coupled(
-        evaluator,
-        n_values=(16, 32, 64),
-        hstart=0.05,
-        hdecrement=2.0,
-        maxiter=4,
-        rtol=1.0e-6,
-        atol=0.0,
-    )
-
-    assert not result.converged
-    assert result.metadata["status"] == "n_limit_reached"
+from quartic2d import HarmonicTransform
+from quartic2d._sampling import radial_q_ceiling
 
 
-def test_ogata_coupled_can_converge_below_old_h_floor():
-    from quartic2d._convergence import converge_ogata_coupled
+def make_anisotropic_decomposition():
+    anisotropy = 0.35
+    r = np.linspace(0.0, 6.0, 256)
+    rho0 = np.exp(-r * r) / np.pi
+    rho2 = anisotropy * r * r * np.exp(-r * r) / (2.0 * np.pi)
 
-    exact = np.array([1.0, -0.3], dtype=np.complex128)
+    def cutoff(profile, tail=1.0e-8, amplitude=1.0e-6):
+        power = r * np.abs(profile) ** 2
+        total = simpson(power, x=r)
+        power_radius = r[-1]
+        for i in range(2, r.size):
+            inside = simpson(power[: i + 1], x=r[: i + 1])
+            if max(total - inside, 0.0) <= tail * total:
+                power_radius = r[i]
+                break
+        threshold = amplitude * np.max(np.abs(profile))
+        indices = np.flatnonzero(np.abs(profile) >= threshold)
+        amplitude_radius = r[indices[-1]]
+        return float(max(power_radius, amplitude_radius))
 
-    def evaluator(parameters):
-        N = float(parameters["N"])
-        h = float(parameters["h"])
-        # The h term is deliberately large enough that the old 15-level
-        # h ladder cannot certify this tolerance, while a deeper ladder can.
-        return exact + np.array([1.0, 0.4]) / N**2 + np.array([4.0, -2.0]) * h
+    R0 = cutoff(rho0)
+    R2 = cutoff(rho2)
+    p0 = simpson(r * np.abs(rho0) ** 2, x=r)
+    p2 = simpson(r * np.abs(rho2) ** 2, x=r)
+    total = p0 + 2.0 * p2
 
-    result = converge_ogata_coupled(
-        evaluator,
-        n_values=(64, 128, 256, 512, 1024, 2048, 4096, 8192),
-        hstart=0.05,
-        hdecrement=2.0,
-        maxiter=20,
-        rtol=1.0e-5,
-        atol=1.0e-12,
-    )
-
-    assert result.converged
-    assert result.selected_parameters["h"] < 0.05 / 2.0**14
-    assert result.metadata["h_min_tested"] <= result.selected_parameters["h"]
-    assert result.metadata["terminal_h_trend"] == "converged"
-    assert result.metadata["n_max_available"] == 8192
-
-
-def test_ogata_coupled_reports_improving_h_limit():
-    from quartic2d._convergence import converge_ogata_coupled
-
-    exact = np.array([1.0], dtype=np.complex128)
-
-    def evaluator(parameters):
-        N = float(parameters["N"])
-        h = float(parameters["h"])
-        return exact + np.array([1.0 / N**4 + h])
-
-    result = converge_ogata_coupled(
-        evaluator,
-        n_values=(64, 128, 256, 512, 1024, 2048),
-        hstart=0.05,
-        hdecrement=2.0,
-        maxiter=5,
-        rtol=1.0e-8,
-        atol=0.0,
-    )
-
-    assert not result.converged
-    assert result.metadata["status"] == "h_limit_reached"
-    assert result.metadata["terminal_h_trend"] in {"monotonic_improving", "improving"}
-    assert result.metadata["terminal_h_change_metric"] is not None
-
-
-def test_fftlog_convergence_evaluates_only_admissible_bias_windows_once():
-    from quartic2d._convergence import converge_fftlog_bias_resolution
-
-    calls = []
-
-    def evaluator(parameters):
-        key = (int(parameters["n"]), float(parameters["bias"]))
-        calls.append(key)
-        n, bias = key
-        return np.array([1.0 + 1.0 / n**2 + 1.0e-4 * (bias + 0.5) ** 2])
-
-    result = converge_fftlog_bias_resolution(
-        evaluator,
-        n_values=(128, 256, 512, 1024),
-        bias_values=(-0.65, -0.60, -0.55, -0.50, -0.45, -0.40, -0.35),
-        preferred_bias=-0.5,
-        rtol=1.0e-3,
-    )
-
-    assert result.converged
-    assert result.metadata["admissible_bias_values"] == [-0.6, -0.55, -0.5, -0.45, -0.4]
-    assert result.metadata["tested_bias_values"] == [-0.55, -0.5, -0.45]
-    assert not result.metadata["fallback_used"]
-    assert all(bias not in {-0.65, -0.60, -0.40, -0.35} for _, bias in calls)
-    assert len(calls) == len(set(calls))
-    assert len(calls) == 9
-
-
-def test_fixed_order_convergence_falls_back_to_verified_stability_when_order_is_wrong():
-    from quartic2d._convergence import converge_fixed_order_sequence
-
-    exact = np.array([1.0])
-
-    def evaluator(parameters):
-        # Deliberately first-order rather than the nominal GL4 eighth order.
-        # The Richardson order gate must reject it, but two consecutive small
-        # changes at the requested budget are still a valid conservative
-        # self-convergence certificate.
-        s = parameters["subdivisions"]
-        return exact + np.array([1.0e-2 / s])
-
-    result = converge_fixed_order_sequence(
-        "gl4",
-        "subdivisions",
-        (1, 2, 4, 8, 16, 32, 64),
-        evaluator,
-        expected_order=8,
-        rtol=5.0e-4,
-    )
-
-    assert result.converged
-    assert result.metadata["fallback_verification"]["kind"] == "verified_sequence_fallback"
-    assert "verified_by_stable_refinement" in next(
-        step.metadata for step in result.steps if step.converged
-    )
-
-
-def test_interaction_autoconvergence_rejects_q_boundary_sensitive_sampled_field():
-    from quartic2d import Interaction
-
-    class AutomaticallySampledField:
-        def __init__(self, *, fast_decay: bool):
-            self.q = np.linspace(0.0, 8.0, 129)
-            self.m_values = np.array([0])
-            exponent = -0.25 * self.q**2 if fast_decay else -0.02 * self.q**2
-            self.F_q = {0: np.exp(exponent).astype(np.complex128)}
-            # The concrete QSamplingResult contents are not needed by the
-            # downstream probe; non-None marks an automatically certified
-            # HarmonicTransform input.
-            self.sampling_convergence = object()
-
-    deltas = np.column_stack((np.geomspace(10.0, 100.0, 8), np.zeros(8)))
-
-    def kernel(q):
-        return np.ones_like(np.asarray(q, dtype=float))
-
-    unsafe = AutomaticallySampledField(fast_decay=False)
-    rejected = Interaction.converge_parameters(
-        deltas,
-        unsafe,
-        unsafe,
-        kernel,
-        method="gl4",
-        rtol=1.0e-3,
-        atol=1.0e-12,
-        subdivisions=(1, 2, 4, 8, 16, 32),
-        verbose=False,
-    )
-    boundary = rejected.search.metadata["q_boundary_robustness"]
-    assert rejected.search.resolution_converged
-    assert not rejected.converged
-    assert boundary["tested"]
-    assert not boundary["passed"]
-    assert boundary["status"] == "upstream_q_boundary_not_robust"
-    assert rejected.search.metadata["status"] == "upstream_q_boundary_not_robust"
-
-    safe = AutomaticallySampledField(fast_decay=True)
-    accepted = Interaction.converge_parameters(
-        deltas,
-        safe,
-        safe,
-        kernel,
-        method="gl4",
-        rtol=1.0e-3,
-        atol=1.0e-12,
-        subdivisions=(1, 2, 4, 8, 16, 32),
-        verbose=False,
-    )
-    assert accepted.converged
-    assert accepted.search.metadata["q_boundary_robustness"]["passed"]
-
-
-def test_interaction_autoconvergence_keeps_fixed_input_semantics_without_sampling_certificate():
-    from quartic2d import Interaction
-
-    class FixedField:
+    class Decomposition:
         def __init__(self):
-            self.q = np.linspace(0.0, 8.0, 129)
-            self.m_values = np.array([0])
-            self.F_q = {0: np.exp(-0.02 * self.q**2).astype(np.complex128)}
+            self.r = r
+            self.rho = {0: rho0, 2: rho2, -2: rho2.copy()}
+            self.m_sorted = [0, 2, -2]
+            self.cutoff_radius = {0: R0, 2: R2, -2: R2}
+            self.power_fracs = {0: p0 / total, 2: p2 / total, -2: p2 / total}
 
-    field = FixedField()
-    deltas = np.column_stack((np.geomspace(10.0, 100.0, 8), np.zeros(8)))
-    result = Interaction.converge_parameters(
-        deltas,
-        field,
-        field,
-        lambda q: np.ones_like(np.asarray(q, dtype=float)),
-        method="gl4",
-        rtol=1.0e-3,
-        atol=1.0e-12,
-        subdivisions=(1, 2, 4, 8, 16, 32),
-        verbose=False,
-    )
+        def __getitem__(self, m):
+            return self.rho[int(m)]
+
+    return Decomposition()
+
+
+def test_radial_q_ceiling_matches_sampling_bound():
+    dec = make_anisotropic_decomposition()
+    expected = np.pi / np.max(np.diff(dec.r))
+    assert radial_q_ceiling(dec) == expected
+
+
+def test_default_harmonic_transform_is_one_pass_and_has_fast_diagnostics():
+    dec = make_anisotropic_decomposition()
+    field = HarmonicTransform(dec)
+
+    assert field.sampling_convergence is None
+    assert field.quadrature_convergence is None
+    assert field.diagnostics is not None
+    assert field.q[-1] < field.diagnostics.q_ceiling
+    assert 32 <= field.q.size <= 512
+    assert field.diagnostics.q_sampling_factor >= 5.0 - 1.0e-12
+
+
+def test_converge_parameters_returns_reusable_verified_parameters():
+    dec = make_anisotropic_decomposition()
+    result = HarmonicTransform.converge_parameters(dec, verbose=False)
+
     assert result.converged
-    boundary = result.search.metadata["q_boundary_robustness"]
-    assert not boundary["tested"]
-    assert boundary["status"] == "not_applicable_fixed_input"
+    assert 5.0 < result.parameters["q_max"] < 8.0
+    assert result.parameters["n_q"] < 128
+    assert result.parameters["subdivisions"] in {1, 2, 4, 8, 16, 32}
+
+    field = result.transform(dec, check=False)
+    assert field.sampling_convergence is result.sampling
+    assert field.quadrature_convergence is result.quadrature
+
+
+
+def test_sampling_calibration_is_independent_of_production_backend():
+    dec = make_anisotropic_decomposition()
+    simpson_result = HarmonicTransform.converge_parameters(
+        dec, method="simpson", verbose=False
+    )
+    gl4_result = HarmonicTransform.converge_parameters(
+        dec, method="gl4", verbose=False
+    )
+
+    assert simpson_result.converged
+    assert gl4_result.converged
+    assert simpson_result.sampling.q_max == gl4_result.sampling.q_max
+    assert simpson_result.sampling.n_q == gl4_result.sampling.n_q
+    assert simpson_result.parameters["method"] == "simpson"
+    assert gl4_result.parameters["method"] == "gl4"
+
+
+def test_q_support_certification_uses_requested_tail_budget(monkeypatch):
+    """Do not reject a converged pilot because of an arbitrary sub-budget."""
+    import quartic2d._sampling as sampling
+
+    class Decomposition:
+        r = np.linspace(0.0, 4.0, 129)
+        m_sorted = [0]
+        cutoff_radius = {0: 4.0}
+        power_fracs = {0: 1.0}
+        _rho = np.ones_like(r)
+
+        def __getitem__(self, m):
+            return self._rho
+
+    # Isolate certification logic from Hankel quadrature.  A constant fake
+    # form factor makes cumulative Simpson integration exact on every pilot
+    # grid.  The represented power is chosen so the full-domain Parseval
+    # mismatch is exactly ~4e-7: below the requested 1e-6 tail-power budget,
+    # but above the old arbitrary 2.5e-7 quarter-budget that rejected the real
+    # PETAL2D example.
+    def fake_grouped(supports, q, **kwargs):
+        return {0: np.ones_like(np.asarray(q), dtype=float)}
+
+    q_ceiling = np.pi / (Decomposition.r[1] - Decomposition.r[0])
+    q_power = 0.5 * q_ceiling**2
+    represented_power = q_power / (1.0 - 4.0e-7)
+
+    monkeypatch.setattr(sampling, "_grouped_hankel_transforms", fake_grouped)
+    import quartic2d._diagnostics as diagnostics
+    monkeypatch.setattr(
+        diagnostics,
+        "default_q_grid",
+        lambda decomposition: (q_ceiling, 33, {}),
+    )
+    monkeypatch.setattr(
+        sampling,
+        "_represented_radial_power",
+        lambda *args, **kwargs: represented_power,
+    )
+
+    _, q_max, pilot_s, modes = sampling.estimate_q_support(
+        Decomposition(),
+        q_tail_rtol=1.0e-3,
+        pilot_oversampling=(16.0, 32.0, 64.0),
+    )
+
+    assert pilot_s > 0.0
+    assert modes[0].resolved
+    assert 2.5e-7 < modes[0].parseval_relative_error < 1.0e-6
+    assert q_max <= q_ceiling

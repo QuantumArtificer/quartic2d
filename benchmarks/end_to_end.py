@@ -295,7 +295,7 @@ def main() -> None:
     ap.add_argument("--large-reference-max-levels", type=int, default=4)
     ap.add_argument(
         "--output",
-        default="benchmarks/results/publication/end_to_end_standard.json",
+        default="benchmarks/results/end_to_end_standard.json",
     )
     args = ap.parse_args()
 
