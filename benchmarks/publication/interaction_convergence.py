@@ -507,7 +507,7 @@ def main():
             "upstream_error_policy": "external to Interaction convergence and excluded from validation error",
             "finite_rule_validation": "automatic selection is compared with the minimum tested subdivision count satisfying both relative L2 and peak-normalized error targets; conservative missed certificates are reported as selector-efficiency misses, not correctness failures",
             "fftlog_capability": "the complete benchmark search box is oracle-tested separately from the automatic certificate so non-monotone n/bias behavior cannot be misreported as backend incapability",
-            "ogata_policy": "Ogata remains benchmark/private but is validated on the same large-delta references as public methods",
+            "ogata_policy": "Ogata is a public specialist backend and is validated on the same large-delta references as the other public methods",
             "coverage_policy": "every case, tolerance, and delta regime must have at least one automatically certified method that independently passes the requested tolerance",
         },
         "environment": environment_metadata(),

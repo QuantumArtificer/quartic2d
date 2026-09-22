@@ -106,13 +106,24 @@ also plots the q-support, q-grid interpolation, and radial-quadrature convergenc
 
 ## Interaction transforms
 
-`Interaction` evaluates a radially symmetric momentum-space kernel `U_q(q)` for one or more displacement vectors. GL4 is the benchmarked general-purpose interaction backend and the public default. Simpson, GL8, and trapezoidal finite-grid methods remain available, while FFTLog is retained as a specialist high-throughput backend for workloads where its convergence checks certify the requested accuracy.
+`Interaction` evaluates a radially symmetric momentum-space kernel `U_q(q)` for one or more displacement vectors. GL4 is the benchmarked general-purpose interaction backend and the public default. Simpson, GL8, and trapezoidal finite-grid methods remain available; FFTLog is the high-throughput option for compatible qualified workloads; and Ogata is a public oscillatory specialist using the optional `hankel` dependency (`pip install "quartic2d[ogata]"`).
 
 ```python
 from quartic2d import Interaction
 
 interaction = Interaction(deltas, transformed, transformed, U_q)
 ```
+
+Ogata can be selected directly from the public API:
+
+```python
+interaction = Interaction(
+    deltas, transformed, transformed, U_q,
+    method="ogata", N=32768, h=1.953125e-4,
+)
+```
+
+For unfamiliar workloads, prefer `Interaction.converge_parameters(..., method="ogata")` over guessing `N` and `h`. The coupled search checks both parameters on the assembled interaction.
 
 For production calculations, use `Interaction.converge_parameters(...)` to
 calibrate the interaction backend.  If `transformed` was built from

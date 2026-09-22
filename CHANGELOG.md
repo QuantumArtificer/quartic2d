@@ -7,7 +7,7 @@ All notable changes to QUARTIC2D will be documented in this file.
 ### Added
 - PETAL2D integration for transforming retained angular harmonics and evaluating radial-kernel interactions.
 - Sampled radial quadratures using trapezoidal, Simpson, composite 4-point Gauss--Legendre, and composite 8-point Gauss--Legendre rules.
-- Ogata Hankel quadrature through the `hankel` package.
+- Public Ogata Hankel quadrature through the optional `hankel` package (`quartic2d[ogata]`).
 - FFTLog interaction transforms through `scipy.fft.fht`.
 - `rtol`/`atol` convergence interfaces for sampled quadratures, FFTLog resolution, and Ogata parameter selection.
 - Harmonic-resolved public interaction outputs `Phi_mm`, `H_mm`, `V_mm`, and total `V`.
@@ -20,7 +20,7 @@ All notable changes to QUARTIC2D will be documented in this file.
 
 ### Changed
 - Simpson is the default sampled radial quadrature; GL4 and GL8 remain available as higher-order finite-quadrature backends.
-- FFTLog is the default interaction transform with `n=512` and `bias=-0.5`.
+- GL4 is the default interaction transform; FFTLog and Ogata remain explicit workload-dependent alternatives.
 - Radial support is read from the public PETAL2D `cutoff_radius` mapping.
 - Numerical backend parameters use established names including `rtol`, `atol`, `subdivisions`, `N`, `h`, `nu`, `n`, `bias`, and `offset`.
 - Cubic interpolation in q space uses not-a-knot boundary conditions; radial-profile cubic interpolation remains natural.

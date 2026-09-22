@@ -25,7 +25,6 @@ from typing import Callable, Iterable
 import numpy as np
 
 from quartic2d import HarmonicTransform, Interaction
-from quartic2d._experimental.ogata import Interaction as OgataInteraction
 
 from benchmarks._common import environment_metadata
 from benchmarks._interaction_suite import (
@@ -43,7 +42,7 @@ from benchmarks._interaction_suite import (
 from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
 
 SUPPORTED_HARMONIC_METHODS = ("trapezoid", "simpson", "gl4", "gl8")
-SUPPORTED_INTERACTION_METHODS = FINITE_METHODS + ("fftlog",)
+SUPPORTED_INTERACTION_METHODS = FINITE_METHODS + ("fftlog", "ogata")
 DEFAULT_HARMONIC_WORKLOADS = (
     "gaussian_isotropic",
     "gaussian_anisotropic_m2",
@@ -250,7 +249,7 @@ def make_displacements(domain: str, n: int) -> np.ndarray:
 
 
 def interaction_class(method: str):
-    return OgataInteraction if method == "ogata" else Interaction
+    return Interaction
 
 
 def interaction_parameters(
@@ -720,7 +719,7 @@ def main() -> None:
     )
     parser.add_argument("--harmonic-workloads", default="default")
     parser.add_argument("--interaction-cases", default="default")
-    parser.add_argument("--methods", default=",".join(SUPPORTED_INTERACTION_METHODS))
+    parser.add_argument("--methods", default="simpson,gl4,fftlog")
     parser.add_argument("--include-ogata", action="store_true")
     parser.add_argument("--tolerances", default="1e-4")
     parser.add_argument("--q-tail-rtol", type=float, default=1.0e-3)
@@ -832,7 +831,7 @@ def main() -> None:
             "upper_candidate_timing": "production timing at the highest tested resolution candidate; numerical sufficiency is external to this performance benchmark",
             "profiling": "cProfile is executed in a separate untimed convergence run and does not contribute to reported timing samples",
             "validation_policy": "no accuracy or reference-solution claim is made by this benchmark",
-            "delta_regime_policy": "standard and large-delta regimes use distinct, predeclared convergence search boxes; large delta extends finite-rule resolution and centers the FFTLog bias search near zero, while Ogata can be included as the private oscillatory specialist",
+            "delta_regime_policy": "standard and large-delta regimes use distinct, predeclared convergence search boxes; large delta extends finite-rule resolution and centers the FFTLog bias search near zero, while Ogata is the public oscillatory specialist",
         },
         "environment": environment_metadata(),
         "settings": {

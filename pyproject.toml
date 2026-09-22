@@ -43,6 +43,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ogata = ["hankel>=1.2.2"]
+# Compatibility alias retained for users of the pre-public Ogata backend.
 experimental = ["hankel>=1.2.2"]
 test = ["pytest>=8"]
 release = ["build>=1.2", "twine>=5"]

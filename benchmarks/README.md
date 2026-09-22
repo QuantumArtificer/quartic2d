@@ -32,9 +32,9 @@ The canonical tolerance hierarchy has three application roles rather than a sing
 
 Large-displacement stage-specific and cross-stage correctness jobs use 12 logarithmically spaced displacement magnitudes across $10^2\leq\delta\leq10^4$, with the deterministic angle sweep used by the benchmark harness. This is the prevalidated oracle grid for the strict reference-stability budget. The more expensive true end-to-end large-displacement benchmark uses four representative logarithmically spaced magnitudes spanning the same interval; its role is full-stack composition validation rather than repeating the denser stage-specific sweep. Standard-domain correctness and performance timing retain 32 displacement samples.
 
-The large-displacement cross-stage job exercises Simpson, GL4, FFTLog, and the private Ogata benchmark backend. Its correctness gate is safety-oriented: every emitted automatic certificate must pass the independent dense-field reference. Safe backend refusals are allowed, and automatically sampled HarmonicTransform inputs are additionally subjected to the production q-boundary robustness probe. Per-case coverage is reported separately so an unsupported upstream representation cannot be hidden by a backend self-convergence certificate.
+The large-displacement cross-stage job exercises Simpson, GL4, FFTLog, and the public Ogata backend. Its correctness gate is safety-oriented: every emitted automatic certificate must pass the independent dense-field reference. Safe backend refusals are allowed, and automatically sampled HarmonicTransform inputs are additionally subjected to the production q-boundary robustness probe. Per-case coverage is reported separately so an unsupported upstream representation cannot be hidden by a backend self-convergence certificate.
 
-A dedicated practical-tier large-displacement pair of publication jobs complements the primary `1e-4` study. `interaction-large-practical-convergence` repeats the canonical four-case large-delta capability/certification matrix at `1e-3`, while `interaction-large-practical-performance` measures calibration and fixed-parameter production timing on the same cases and tolerance. The two outputs are kept separate because timing does not establish accuracy. Together they support workload-conditioned throughput and calibration-amortization claims without changing any numerical algorithm or search box.
+A dedicated practical-tier large-displacement publication set complements the primary `1e-4` study. `interaction-large-practical-convergence` repeats the canonical four-case large-delta capability/certification matrix at `1e-3`; `interaction-large-practical-performance` measures automatic calibration and selected production timing on the same cases; and `interaction-large-qualified-fixed-performance` measures fixed production cost for every configuration already shown by the independent reference to satisfy `1e-3`, including conservative automatic refusals whose terminal parameters pass. Accuracy and timing remain separate evidence classes.
 
 ## Canonical runs
 
@@ -53,7 +53,7 @@ python -m benchmarks.run_suite publication
 Run only the practical-tier large-displacement extension after committing the benchmark-plan patch:
 
 ```bash
-python -m benchmarks.run_suite publication --only interaction-large-practical-convergence,interaction-large-practical-performance
+python -m benchmarks.run_suite publication --only interaction-large-practical-convergence,interaction-large-practical-performance,interaction-large-qualified-fixed-performance
 ```
 
 Subset runs write a separate `manifest_<job...>.json` and do not overwrite the canonical full-suite `manifest.json`.

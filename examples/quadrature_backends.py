@@ -16,9 +16,13 @@ print("interpolator:", transform.interpolator)
 
 reference = transform.F_q.copy()
 for method in METHODS:
-    if method == "ogata":
-        transform.set_method(method, N=1024, h=0.002)
-    else:
-        transform.set_method(method)
+    try:
+        if method == "ogata":
+            transform.set_method(method, N=1024, h=0.002)
+        else:
+            transform.set_method(method)
+    except ImportError as exc:
+        print(f"{method:10s} unavailable: {exc}")
+        continue
     difference = np.linalg.norm(transform.F_q - reference) / np.linalg.norm(reference)
     print(f"{method:10s} relative difference from default Simpson: {difference:.6e}")

@@ -1,4 +1,9 @@
-"""Experimental Ogata Hankel-transform backend."""
+"""Backward-compatible aliases for the now-public Ogata backend.
+
+New code should import :class:`quartic2d.HankelTransform`,
+:class:`quartic2d.HarmonicTransform`, and :class:`quartic2d.Interaction` directly
+and select ``method="ogata"``.
+"""
 
 from __future__ import annotations
 

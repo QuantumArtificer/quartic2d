@@ -41,7 +41,7 @@ The unit tests cover:
 - analytic Hankel-transform values and the $q=0$ limit;
 - positive and negative integer harmonic orders;
 - scalar and array interpolation;
-- supported finite quadrature and FFTLog backends, with Ogata retained in the experimental benchmark suite;
+- supported finite quadrature, FFTLog, and public Ogata backends;
 - PETAL2D integration and input immutability;
 - displacement validation, arbitrary displacement ordering, and phase factors;
 - zero-displacement selection rules and singular-kernel endpoint handling;

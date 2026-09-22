@@ -18,7 +18,6 @@ from numpy.polynomial.legendre import leggauss
 from scipy.special import jv
 
 from quartic2d import HarmonicTransform, Interaction
-from quartic2d._experimental.ogata import Interaction as OgataInteraction
 from quartic2d._numerics import common_grid
 
 from benchmarks.publication.harmonic_transform import SyntheticDecomposition, workloads
@@ -777,7 +776,7 @@ def relative_peak(value, reference):
 
 
 def interaction_class(method: str):
-    return OgataInteraction if method == "ogata" else Interaction
+    return Interaction
 
 
 def interaction_from_parameters(deltas, field1, field2, kernel, method, parameters):

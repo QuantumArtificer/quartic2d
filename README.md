@@ -26,15 +26,21 @@ and combines the transformed harmonics to evaluate displaced interactions for ra
 python -m pip install quartic2d
 ```
 
+Ogata quadrature is a supported optional backend. Install its dependency with
+
+```bash
+python -m pip install "quartic2d[ogata]"
+```
+
 For development:
 
 ```bash
 git clone https://github.com/QuantumArtificer/quartic2d.git
 cd quartic2d
-python -m pip install -e ".[test,docs,release]"
+python -m pip install -e ".[test,docs,release,ogata]"
 ```
 
-QUARTIC2D supports Python 3.10--3.13 and depends on NumPy, SciPy, Matplotlib, `hankel`, and PETAL2D.
+QUARTIC2D supports Python 3.10--3.13 and depends on NumPy, SciPy, Matplotlib, and PETAL2D. The public Ogata backend uses the optional `hankel` dependency installed by the `ogata` extra.
 
 ## Basic usage
 
@@ -96,16 +102,16 @@ For the sampled radial transform $\rho_m(r)\rightarrow F_m(q)$, available quadra
 
 For the interaction transform, available backends are:
 
-- FFTLog (default; `n=512`, `bias=-0.5`)
-- `gl4`
+- `gl4` (default)
+- FFTLog (`n=512`, `bias=-0.5`)
 - `gl8`
 - Simpson
 - trapezoidal
 - Ogata
 
-The full benchmark suite compares accuracy, convergence, and runtime across smooth, higher-order, nodal, algebraic, oscillatory, and discontinuous reference problems. In the release benchmark, Simpson and GL4 both give high-quality sampled radial transforms; Simpson reaches comparable accuracy at lower cost for the tested sampled PETAL2D-like profiles, while GL4/GL8 remain useful finite-quadrature verification backends. FFTLog provides the default high-throughput interaction transform, while Ogata remains available for specialist oscillatory calculations.
+The full benchmark suite compares accuracy, convergence, and runtime across smooth, higher-order, nodal, algebraic, oscillatory, and discontinuous reference problems. In the release benchmark, Simpson and GL4 both give high-quality sampled radial transforms; Simpson reaches comparable accuracy at lower cost for the tested sampled PETAL2D-like profiles, while GL4/GL8 remain useful finite-quadrature verification backends. GL4 is the robust general-purpose interaction default. FFTLog provides a high-throughput option for compatible qualified workloads, while public Ogata quadrature provides a complementary oscillatory specialist whose `N` and `h` parameters can be calibrated explicitly.
 
-The defaults are intended for normal use. Use `HarmonicTransform.converge_parameters(...)` when a fast diagnostic warns, when you need a documented numerical tolerance, or when you want to reduce runtime or memory for a repeated production workload.
+The defaults are intended for normal use. Use `HarmonicTransform.converge_parameters(...)` when a fast diagnostic warns, when you need a documented numerical tolerance, or when you want to reduce runtime or memory for a repeated production workload. For radial Ogata transforms, `HankelTransform.converge(...)` / `HarmonicTransform.converge(...)` calibrate `N` and `h` on an already chosen q grid; the full q-support `HarmonicTransform.converge_parameters(...)` path currently calibrates the finite-grid radial backends.
 
 ## Examples
 

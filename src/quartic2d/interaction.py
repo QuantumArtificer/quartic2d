@@ -64,7 +64,7 @@ class HankelTransform:
     r_cutoff : float or None, optional
         Largest radius included in the represented profile.  Samples beyond it
         are ignored.  ``None`` uses the entire supplied radial interval.
-    method : {'trapezoid', 'simpson', 'gl4', 'gl8'}, default='simpson'
+    method : {'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}, default='simpson'
         Numerical rule used to evaluate the radial integral.  Simpson is the
         general-purpose default; the other methods are primarily useful for
         verification or specialist workloads.
@@ -354,7 +354,7 @@ class HarmonicTransform:
         does not weaken interpolation checks; the convergence helper verifies
         every final interval against direct Hankel evaluations before returning
         it.
-    method : {'trapezoid', 'simpson', 'gl4', 'gl8'}, default='simpson'
+    method : {'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}, default='simpson'
         Numerical rule used for the radial Hankel integral.  Simpson is the
         default because the benchmark suite found a good accuracy/cost balance.
     interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
@@ -1159,11 +1159,11 @@ class Interaction:
         Momentum-space harmonic representations.
     U_q : callable
         Radially symmetric momentum-space interaction kernel.
-    method : {'fftlog', 'trapezoid', 'simpson', 'gl4', 'gl8'}, default='gl4'
+    method : {'fftlog', 'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}, default='gl4'
         Numerical method used for the interaction Hankel transform. GL4 is the
-        benchmarked general-purpose default; FFTLog remains available as a
-        specialist high-throughput backend when its convergence certificate is
-        satisfied.
+        benchmarked general-purpose default; FFTLog is a high-throughput option
+        for compatible workloads, while Ogata is a public oscillatory specialist
+        with coupled ``(N, h)`` convergence support.
     interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
         Interpolator used for sampled momentum-space harmonics.
     n : int, default=512

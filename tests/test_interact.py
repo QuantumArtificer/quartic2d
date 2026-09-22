@@ -47,16 +47,20 @@ def test_interaction_requires_callable_kernel():
 
 
 
-def test_ogata_interaction_backend_is_not_public():
+def test_ogata_interaction_backend_is_public():
+    pytest.importorskip("hankel")
     h = AnalyticHarmonics({0: gaussian_transform})
-    with pytest.raises(ValueError, match="method"):
-        Interaction(
-            np.array([[1.0, 0.0]]),
-            h,
-            h,
-            lambda q: np.exp(-q),
-            method="ogata",
-        )
+    result = Interaction(
+        np.array([[1.0, 0.0]]),
+        h,
+        h,
+        lambda q: np.exp(-q),
+        method="ogata",
+        N=128,
+        h=0.025,
+    )
+    assert result.method == "ogata"
+    assert np.all(np.isfinite(result.V))
 
 
 def test_phase_factors_follow_harmonic_difference():
@@ -158,8 +162,6 @@ def test_interaction_setters_switch_methods():
 
 def test_ogata_reuses_transform_objects_by_order(monkeypatch):
     hankel = pytest.importorskip("hankel")
-    from quartic2d._experimental.ogata import Interaction as OgataInteraction
-
     real = hankel.HankelTransform
     calls = []
 
@@ -178,7 +180,7 @@ def test_ogata_reuses_transform_objects_by_order(monkeypatch):
         q_max=10.0,
         n_q=257,
     )
-    OgataInteraction(
+    Interaction(
         np.array([[0.5, 0.0], [1.0, 0.0]]),
         h,
         h,

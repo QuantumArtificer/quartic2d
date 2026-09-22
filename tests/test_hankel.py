@@ -37,29 +37,11 @@ def test_simpson_is_default_radial_method():
 
     assert transform.method == "simpson"
 
-def test_ogata_backend_is_not_public():
-    r = np.linspace(0.0, 6.0, 401)
-    q = np.linspace(0.0, 6.0, 65)
-    with pytest.raises(ValueError, match="method"):
-        HankelTransform(
-            0,
-            q,
-            gaussian_profile(r),
-            r,
-            N=512,
-            r_cutoff=5.5,
-            interpolator="cubic",
-            method="ogata",
-        )
-
-
-def test_ogata_backend_remains_available_internally():
+def test_ogata_backend_is_public():
     pytest.importorskip("hankel")
-    from quartic2d._experimental.ogata import HankelTransform as OgataHankelTransform
-
     r = np.linspace(0.0, 6.0, 401)
     q = np.linspace(0.0, 6.0, 65)
-    transform = OgataHankelTransform(
+    transform = HankelTransform(
         0,
         q,
         gaussian_profile(r),
@@ -69,8 +51,16 @@ def test_ogata_backend_remains_available_internally():
         interpolator="cubic",
         method="ogata",
     )
+    assert transform.method == "ogata"
     assert transform.F_q.shape == q.shape
     assert np.all(np.isfinite(transform.F_q))
+
+
+def test_legacy_experimental_ogata_import_remains_compatible():
+    pytest.importorskip("hankel")
+    from quartic2d._experimental.ogata import HankelTransform as LegacyOgataHankelTransform
+
+    assert issubclass(LegacyOgataHankelTransform, HankelTransform)
 
 
 def test_set_method_recomputes_transform():

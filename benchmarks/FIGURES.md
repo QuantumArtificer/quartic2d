@@ -19,7 +19,7 @@ The shared style is `benchmarks/figures/_style.py`.
 - vector PDF and SVG plus 600-dpi PNG;
 - methods use consistent markers across all figures;
 - requested tolerances use consistent line styles/marker fills across all figures;
-- private/experimental Ogata results are visually distinguished from public backends and identified as benchmark-only;
+- Ogata is shown as a public specialist backend, with the same method identity used consistently across figures;
 - no decorative titles when axis labels and caption carry the meaning.
 
 Unless a panel explicitly studies a signed quantity, errors and runtimes use logarithmic axes. Error panels use the common scalar
@@ -76,7 +76,7 @@ Do not merge categories 2 and 3 into a single "failure" fraction.
 
 Rows are quadrature backends:
 
-`trapezoid`, `simpson`, `gl4`, `gl8`, `fftlog`, and benchmark-only `ogata` where available.
+`trapezoid`, `simpson`, `gl4`, `gl8`, `fftlog`, and public `ogata` where available.
 
 Columns represent physically/numerically distinct workload regimes rather than individual case names, for example:
 
@@ -146,7 +146,7 @@ For repeated evaluations of a prequalified workload family define
 - include only method/workload combinations that independently satisfy the target;
 - if a method is only useful for a subset of workload families, show the subset explicitly rather than averaging it together with failed families.
 
-Calibration and production measurements must come from the same benchmark configuration and machine environment. The plot may illustrate amortization; it must not imply that new workload families can skip qualification.
+Calibration and production measurements must come from the same benchmark configuration and machine environment. For conservative automatic refusals whose terminal parameters independently pass the reference, fixed-parameter production timing comes from `interaction-large-qualified-fixed-performance`; those points must be labeled as independently qualified rather than automatically certified. The plot may illustrate amortization; it must not imply that new workload families can skip qualification.
 
 ### Figure 5 — Computational scaling
 
@@ -168,7 +168,7 @@ The supplement contains:
 - full workload/kernel validation tables at each requested tolerance;
 - full method-selection table with certified fraction, bounded capability fraction, worst/median error, production time, and calibration time;
 - FFTLog `(N, q_bias)` sensitivity maps for at least one favorable and one hostile workload, with `1e-3` and `1e-4` contours where available;
-- Ogata `(N, h)` parameter sensitivity / convergence maps and explicit benchmark-only status;
+- Ogata `(N, h)` parameter sensitivity / convergence maps, including its high-cost nodal/cusp limit;
 - difficult/stress inputs and explicit refusals;
 - peak-memory scaling;
 - detailed large-delta oracle stability;

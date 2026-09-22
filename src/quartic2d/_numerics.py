@@ -11,10 +11,11 @@ from scipy.integrate import simpson, trapezoid
 from scipy.interpolate import CubicSpline, PchipInterpolator
 from scipy.special import jv, roots_legendre
 
-_RADIAL_METHODS = ("trapezoid", "simpson", "gl4", "gl8")
-_INTERACTION_METHODS = ("fftlog", "trapezoid", "simpson", "gl4", "gl8")
-_EXPERIMENTAL_RADIAL_METHODS = ("ogata",)
-_EXPERIMENTAL_INTERACTION_METHODS = ("ogata",)
+_RADIAL_METHODS = ("trapezoid", "simpson", "gl4", "gl8", "ogata")
+_INTERACTION_METHODS = ("fftlog", "trapezoid", "simpson", "gl4", "gl8", "ogata")
+# Kept as empty compatibility hooks for the legacy private wrapper classes.
+_EXPERIMENTAL_RADIAL_METHODS: tuple[str, ...] = ()
+_EXPERIMENTAL_INTERACTION_METHODS: tuple[str, ...] = ()
 _INTERPOLATORS = ("linear", "cubic", "pchip")
 
 
@@ -55,8 +56,8 @@ def _require_hankel():
         import hankel
     except ImportError as exc:
         raise ImportError(
-            "The experimental Ogata backend requires the optional 'hankel' dependency. "
-            "Install quartic2d[experimental]."
+            "The Ogata backend requires the optional 'hankel' dependency. "
+            "Install quartic2d[ogata]."
         ) from exc
     return hankel
 
