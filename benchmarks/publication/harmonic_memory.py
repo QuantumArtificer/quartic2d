@@ -98,7 +98,8 @@ def worker(args) -> int:
 def sample_one(*, n_r, n_q, n_m, subdivisions, r_max, q_max, poll_seconds):
     cmd = [
         sys.executable,
-        str(Path(__file__).resolve()),
+        "-m",
+        "benchmarks.publication.harmonic_memory",
         "--worker",
         "--n-r", str(int(n_r)),
         "--n-q", str(int(n_q)),

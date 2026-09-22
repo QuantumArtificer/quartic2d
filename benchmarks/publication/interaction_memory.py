@@ -72,7 +72,7 @@ def worker(args):
 
 def sample_one(*, method, n_p, n_d, n_f, n_q, s_q, poll_s):
     cmd = [
-        sys.executable, str(Path(__file__).resolve()), "--worker",
+        sys.executable, "-m", "benchmarks.publication.interaction_memory", "--worker",
         "--method", method,
         "--n-p", str(int(n_p)), "--n-d", str(int(n_d)),
         "--n-f", str(int(n_f)), "--n-q", str(int(n_q)), "--s-q", str(int(s_q)),
