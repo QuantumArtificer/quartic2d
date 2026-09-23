@@ -295,7 +295,9 @@ def interaction_from_sampled_field(q_grid, F, modes, deltas, kernel, *, method="
         fm = interp_complex(q_grid, F[m], q)
         for mp in modes:
             fp = interp_complex(q_grid, F[mp], q)
-            order = abs(int(m-mp))
+            n = int(m - mp)
+            order = abs(n)
+            bessel_parity = -1.0 if n > 0 and n % 2 else 1.0
             if w is not None:
                 base = w * q * fm * np.conj(fp) * U
                 pair = jv(order, np.outer(deltas, q)) @ base
@@ -307,7 +309,9 @@ def interaction_from_sampled_field(q_grid, F, modes, deltas, kernel, *, method="
                 mat = jv(order, np.outer(deltas, q)) * base[None, :]
                 pair = simpson(mat, x=q, axis=1) if method == "simpson" else trapezoid(mat, x=q, axis=1)
             # delta is chosen along x, hence exp[i(m-m')phi_delta] = 1.
-            result += 2*np.pi*pair
+            # The radial evaluation uses J_|m-m'|, so retain the parity
+            # required by the exact signed order J_{m'-m}.
+            result += 2*np.pi*bessel_parity*pair
     return np.real_if_close(result).real
 
 

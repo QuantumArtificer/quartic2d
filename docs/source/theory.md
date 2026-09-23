@@ -39,12 +39,27 @@ J_{|m-m'|}(q\Delta)
 F_m(q)F_{m'}^*(q)U(q),
 $$
 
-with angular factor
+with angular prefactor
 
 $$
 \Phi_{mm'}(\phi_\Delta)=
-\exp\left[i(m-m')\phi_\Delta\right].
+\eta_{mm'}\exp\left[i(m-m')\phi_\Delta\right],
 $$
+
+where
+
+$$
+\eta_{mm'}=
+\begin{cases}
+(-1)^{m-m'}, & m>m',\\
+1, & m\le m'.
+\end{cases}
+$$
+
+The factor $\eta_{mm'}$ is required because the numerical backends use the
+nonnegative Bessel order $|m-m'|$. Equivalently, the exact angular reduction
+may be written directly with the signed order $J_{m'-m}(q\Delta)$ and no
+separate parity factor.
 
 The harmonic-pair contribution is
 

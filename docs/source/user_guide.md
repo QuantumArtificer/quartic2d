@@ -15,7 +15,7 @@ transformed = HarmonicTransform(dec)
 For each retained harmonic $m$, QUARTIC2D evaluates
 
 $$
-F_m(q)=\int_0^\infty r\,\rho_m(r)J_{|m|}(qr)\,dr.
+F_m(q)=\int_0^\infty r\,\rho_m(r)J_m(qr)\,dr.
 $$
 
 The default path performs one transform pass. It does not hide an automatic convergence study inside object construction.

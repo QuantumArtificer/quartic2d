@@ -621,9 +621,21 @@ def phase_resolved_direct_reference(
             for mp in modes2:
                 base = weights * kernel_values * values1[m] * np.conj(values2[mp])
                 radial = np.sum(jv(abs(m - mp), magnitude * q) * base)
-                value += 2.0 * np.pi * np.exp(1j * (m - mp) * angle) * radial
+                value += (
+                    2.0
+                    * np.pi
+                    * _absolute_order_parity(m, mp)
+                    * np.exp(1j * (m - mp) * angle)
+                    * radial
+                )
         total[index] = value
     return total
+
+
+def _absolute_order_parity(m: int, mp: int) -> float:
+    """Parity factor for replacing ``J_{m'-m}`` by ``J_{|m-m'|}``."""
+    n = int(m) - int(mp)
+    return -1.0 if n > 0 and n % 2 else 1.0
 
 
 def _composite_legendre(grid, order):
@@ -659,7 +671,10 @@ def direct_reference(field1, field2, kernel: Kernel, deltas: np.ndarray, order: 
         for mp in modes2:
             base = weights * kernel.qU(q) * field1(m, q) * np.conj(field2(mp, q))
             radial = jv(abs(m - mp), np.outer(mags, q)) @ base
-            phase = np.exp(1j * (m - mp) * angles)
+            phase = (
+                _absolute_order_parity(m, mp)
+                * np.exp(1j * (m - mp) * angles)
+            )
             total += 2.0 * np.pi * phase * radial
     return total
 

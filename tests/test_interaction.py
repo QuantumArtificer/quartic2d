@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from numpy.polynomial.legendre import leggauss
 
 from quartic2d import Interaction
 
@@ -63,11 +64,11 @@ def test_ogata_interaction_backend_is_public():
     assert np.all(np.isfinite(result.V))
 
 
-def test_phase_factors_follow_harmonic_difference():
+def test_phase_factors_include_absolute_order_bessel_parity():
     h1 = AnalyticHarmonics({0: gaussian_transform, 2: gaussian_transform})
     h2 = AnalyticHarmonics({0: gaussian_transform, -1: gaussian_transform})
     result = Interaction(
-        np.array([[0.0, 0.0], [0.0, 1.0]]),
+        np.array([[1.0, 0.0], [0.0, 1.0]]),
         h1,
         h2,
         lambda q: np.exp(-q),
@@ -75,9 +76,67 @@ def test_phase_factors_follow_harmonic_difference():
     )
 
     assert result.Phi_mm.shape == (2, 2, 2)
-    np.testing.assert_allclose(result.Phi_mm[:, :, 0], 1.0)
+    np.testing.assert_allclose(
+        result.Phi_mm[:, :, 0],
+        np.array([[1.0, -1.0], [1.0, -1.0]], dtype=complex),
+    )
     assert result.Phi_mm[1, 0, 1] == pytest.approx(np.exp(1j * 2 * np.pi / 2.0))
-    assert result.Phi_mm[0, 1, 1] == pytest.approx(np.exp(1j * np.pi / 2.0))
+    assert result.Phi_mm[0, 1, 1] == pytest.approx(-np.exp(1j * np.pi / 2.0))
+
+
+def _direct_q_phi_reference(m, mp, f1, f2, kernel, delta, angle, q_max):
+    """Direct momentum-space reference with no Bessel reduction."""
+    q_nodes, q_weights = leggauss(120)
+    phi_nodes, phi_weights = leggauss(160)
+
+    q = 0.5 * q_max * (q_nodes + 1.0)
+    wq = 0.5 * q_max * q_weights
+    phi = np.pi * (phi_nodes + 1.0)
+    wphi = np.pi * phi_weights
+
+    q2d = q[:, None]
+    phi2d = phi[None, :]
+    rho1 = ((-1j) ** int(m)) * np.exp(1j * int(m) * phi2d) * f1(q2d)
+    rho2 = ((-1j) ** int(mp)) * np.exp(1j * int(mp) * phi2d) * f2(q2d)
+    translation = np.exp(
+        -1j * q2d * float(delta) * np.cos(phi2d - float(angle))
+    )
+    integrand = (
+        q2d
+        * kernel(q2d)
+        * rho1
+        * np.conj(rho2)
+        * translation
+    )
+    return np.sum(wq[:, None] * wphi[None, :] * integrand)
+
+
+@pytest.mark.parametrize(
+    "m, mp", [(1, 0), (0, 1), (-1, 0), (0, -1), (3, 0), (0, 3)]
+)
+def test_odd_harmonic_difference_matches_direct_q_phi_reference(m, mp):
+    q_max = 8.0
+    f1 = lambda q: (q ** abs(m)) * np.exp(-0.35 * q**2)
+    f2 = lambda q: (q ** abs(mp)) * np.exp(-0.45 * q**2)
+    kernel = lambda q: np.exp(-0.2 * q**2)
+    delta = 1.3
+    angle = 0.37
+
+    h1 = AnalyticHarmonics({m: f1}, q_max=q_max, n_q=1025)
+    h2 = AnalyticHarmonics({mp: f2}, q_max=q_max, n_q=1025)
+    result = Interaction(
+        np.array([[delta * np.cos(angle), delta * np.sin(angle)]]),
+        h1,
+        h2,
+        kernel,
+        method="gl8",
+        subdivisions=2,
+    )
+    reference = _direct_q_phi_reference(
+        m, mp, f1, f2, kernel, delta, angle, q_max
+    )
+
+    assert result.V[0] == pytest.approx(reference, rel=2e-8, abs=2e-10)
 
 
 @pytest.mark.parametrize("method", ["trapezoid", "simpson", "gl4", "gl8"])

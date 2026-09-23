@@ -1181,7 +1181,9 @@ class Interaction:
     Attributes
     ----------
     Phi_mm : ndarray
-        Angular phase factors for every harmonic pair and displacement.
+        Complete angular prefactors for every harmonic pair and displacement,
+        including the parity factor required when the radial backends evaluate
+        the translation Bessel function at nonnegative order ``|m-m'|``.
     H_mm : ndarray
         Radial Hankel integrals for every harmonic pair and displacement.
     V_mm : ndarray
@@ -1796,7 +1798,13 @@ class Interaction:
 
     def _phase_factors(self) -> np.ndarray:
         m_difference = self._m_values1[:, None] - self._m_values2[None, :]
-        return np.exp(
+        # The exact reduced interaction contains J_{m'-m}.  Numerical
+        # backends evaluate J_{|m-m'|}, so positive odd m-m' pairs require
+        # the parity factor from J_{-(m-m')} = (-1)^(m-m') J_{m-m'}.
+        bessel_parity = np.where(
+            (m_difference > 0) & (m_difference % 2 != 0), -1.0, 1.0
+        )
+        return bessel_parity[:, :, None] * np.exp(
             1j * m_difference[:, :, None] * self._delta_angles[None, None, :]
         )
 
