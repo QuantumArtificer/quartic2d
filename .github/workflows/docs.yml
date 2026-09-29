@@ -26,7 +26,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Install documentation dependencies
         run: python -m pip install -e ".[docs,ogata]"
       - name: Generate guided-example figures

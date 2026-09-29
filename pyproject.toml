@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quartic2d"
 dynamic = ["version"]
-description = "Four-center interaction integrals for localized two-dimensional states."
+description = "Four-center interaction tensors for localized two-dimensional orbital bases."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -37,7 +37,7 @@ classifiers = [
 ]
 dependencies = [
   "numpy>=1.23",
-  "scipy>=1.9",
+  "scipy>=1.12",
   "matplotlib>=3.6",
   "petal2d>=0.1.0"
 ]

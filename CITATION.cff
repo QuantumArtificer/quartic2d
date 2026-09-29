@@ -1,15 +1,16 @@
 cff-version: 1.2.0
 message: "If QUARTIC2D contributes to published research, cite the archived software release used in the calculation."
-title: "QUARTIC2D: Angular-Harmonic Evaluation of Four-Center Interactions in Two Dimensions"
+title: "QUARTIC2D: Quadrature for Radial Tetra-center Interaction Coefficients in 2D"
 type: software
 version: 0.1.0
 abstract: >-
-  QUARTIC2D evaluates four-center interaction matrix elements for localized
-  two-dimensional states with translationally invariant radial kernels. The
-  method represents general real or complex transition fields in angular
-  harmonics and reduces the interaction to radial Hankel integrals. The same
-  formulation applies to direct, exchange, pair-hopping, correlated-hopping,
-  and other four-index orbital channels within the radial-kernel assumption.
+  QUARTIC2D evaluates four-center interaction matrix elements for generalized
+  localized orbital bases in two dimensions with translationally invariant
+  radial kernels. The method represents real or complex transition fields in
+  angular harmonics and reduces the interaction to radial Hankel integrals.
+  It supports direct, exchange, pair-hopping, correlated-hopping, and related
+  four-index couplings used to parameterize Hubbard-like and multiorbital
+  effective Hamiltonians within the radial-kernel assumption.
 authors:
   - family-names: "Santacruz"
     given-names: "Alex"

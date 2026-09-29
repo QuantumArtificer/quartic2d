@@ -73,6 +73,7 @@ DOCUMENTATION_RC_PARAMS = {
     "lines.linewidth": 1.5,
     "lines.markersize": 5.0,
     "savefig.bbox": "tight",
+    "svg.hashsalt": "quartic2d-docs",
 }
 
 

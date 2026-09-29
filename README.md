@@ -4,21 +4,25 @@
 [![Documentation](https://github.com/QuantumArtificer/quartic2d/actions/workflows/docs.yml/badge.svg)](https://quantumartificer.github.io/quartic2d/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-QUARTIC2D evaluates four-center interaction matrix elements for localized two-dimensional states. For orbitals $\phi_1,\ldots,\phi_4$ and a translationally invariant radial interaction,
+**QUARTIC2D — Quadrature for Radial Tetra-center Interaction Coefficients in 2D —** evaluates general four-center interaction tensors for localized two-dimensional orbital bases.
+
+Localized-orbital descriptions of two-dimensional quantum materials often use Wannier functions, atomic-like orbitals, defect states, quantum-dot states, or other localized basis functions. In such generalized orbital bases, electron-electron interactions are not described by a single density-density parameter: different permutations of four orbital indices generate direct Coulomb terms, exchange, pair hopping, correlated hopping, and related multiorbital couplings. QUARTIC2D evaluates these matrix elements while retaining the anisotropy, sign structure, and complex phase of the underlying orbital products.
+
+For orbitals $\phi_{1},\ldots,\phi_{4}$ and a translationally invariant radial interaction,
 
 $$
-U_{1234}=\iint d^2\mathbf r\,d^2\mathbf r'\,
-\phi_1^*(\mathbf r)\phi_2^*(\mathbf r')
-U(|\mathbf r-\mathbf r'|)
-\phi_3(\mathbf r)\phi_4(\mathbf r').
+U_{1234}=\iint d^{2}\mathbf{r}\,d^{2}\mathbf{r}'\,
+\phi_{1}^{*}(\mathbf{r})\phi_{2}^{*}(\mathbf{r}')
+U\!\left(\lvert\mathbf{r}-\mathbf{r}'\rvert\right)
+\phi_{3}(\mathbf{r})\phi_{4}(\mathbf{r}').
 $$
 
 The four orbital indices enter through the transition fields
 
 $$
-\rho_{13}=\phi_1^*\phi_3,
+\rho_{13}=\phi_{1}^{*}\phi_{3},
 \qquad
-\rho_{42}=\phi_4^*\phi_2.
+\rho_{42}=\phi_{4}^{*}\phi_{2}.
 $$
 
 These fields may be real or complex. The same formulation therefore applies to direct density-density terms, exchange, pair hopping, correlated hopping, and other four-index channels. The current spatial method assumes a scalar radial kernel $U(q)$.
@@ -53,7 +57,7 @@ QUARTIC2D supports Python 3.10--3.13.
 
 ## Quick start
 
-The example below evaluates a direct term and an exchange term for localized $s$ and $p_x$ orbitals.
+The example below evaluates a direct term and an exchange term for localized $s$ and $p_{x}$ orbitals.
 
 ```python
 import numpy as np
@@ -135,10 +139,10 @@ A four-center orbital integral is specified by the two transition fields. Common
 
 | Term | Matrix element | Transition fields |
 | --- | --- | --- |
-| direct interaction | $U_{ijij}$ | $|\phi_i|^2$ and $|\phi_j|^2$ |
-| exchange | $U_{ijji}$ | $\phi_i^*\phi_j$ and $\phi_i^*\phi_j$ |
-| pair hopping | $U_{iijj}$ | $\phi_i^*\phi_j$ and $\phi_j^*\phi_i$ |
-| correlated hopping | e.g. $U_{iiij}$ | $|\phi_i|^2$ and $\phi_j^*\phi_i$ |
+| direct interaction | $U_{ijij}$ | $\lvert\phi_{i}\rvert^{2}$ and $\lvert\phi_{j}\rvert^{2}$ |
+| exchange | $U_{ijji}$ | $\phi_{i}^{*}\phi_{j}$ and $\phi_{i}^{*}\phi_{j}$ |
+| pair hopping | $U_{iijj}$ | $\phi_{i}^{*}\phi_{j}$ and $\phi_{j}^{*}\phi_{i}$ |
+| correlated hopping | e.g. $U_{iiij}$ | $\lvert\phi_{i}\rvert^{2}$ and $\phi_{j}^{*}\phi_{i}$ |
 
 The mathematical formulation does not require the fields to be densities or real functions. Benchmark coverage is described separately in the validation documentation.
 
@@ -183,7 +187,7 @@ The [User guide](https://quantumartificer.github.io/quartic2d/user_guide/) devel
 - [Limitations](https://quantumartificer.github.io/quartic2d/limitations.html)
 - [Development](https://quantumartificer.github.io/quartic2d/development/)
 
-The public top-level API is intentionally small: `HankelTransform`, `HarmonicTransform`, and `Interaction`.
+The public top-level API is intentionally small: `HankelTransform`, `HarmonicTransform`, `Interaction`, `HarmonicConvergenceResult`, and `InteractionConvergenceResult`.
 
 ## Validation and tests
 

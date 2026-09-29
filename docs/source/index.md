@@ -5,13 +5,13 @@ QUARTIC2D: *Quadrature for Radial Tetra-center Interaction Coefficients in 2D*
 Four-center interactions for localized states in two dimensions
 
 Localized-orbital models of two-dimensional materials often require Coulomb
-matrix elements between Wannier functions, defect states, quantum-dot states,
-or other localized wavefunctions. These matrix elements set the interaction
-parameters of Hubbard-like and multiorbital Hamiltonians, including direct
-terms, exchange, pair hopping, and correlated hopping. The calculation becomes
-more demanding when the orbitals are anisotropic or complex, when dielectric
-screening is nonlocal, or when many separations and orbital combinations must
-be evaluated.
+matrix elements in generalized orbital bases built from Wannier functions,
+atomic-like orbitals, defect states, quantum-dot states, or other localized
+wavefunctions. These matrix elements set the interaction parameters of
+Hubbard-like and multiorbital Hamiltonians, including direct terms, exchange,
+pair hopping, and correlated hopping. The calculation becomes more demanding
+when the orbitals are anisotropic or complex, when dielectric screening is
+nonlocal, or when many separations and orbital combinations must be evaluated.
 
 QUARTIC2D evaluates the corresponding four-center interaction matrix elements
 

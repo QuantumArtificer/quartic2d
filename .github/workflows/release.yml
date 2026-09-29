@@ -40,11 +40,20 @@ jobs:
       - name: Run analytic validation
         run: python -m benchmarks.gaussian_validation --quick --output /tmp/quartic2d-gaussian.json
 
+      - name: Generate guided-example figures
+        run: python docs/scripts/generate_figures.py examples
+
+      - name: Generate guided-example runtime artifacts
+        run: python docs/scripts/generate_example_artifacts.py
+
       - name: Check documentation artifacts
         run: python docs/scripts/check_artifacts.py
 
       - name: Build documentation
         run: python -m sphinx -W --keep-going -b html docs/source docs/_build/html
+
+      - name: Check rendered documentation
+        run: python docs/scripts/check_rendered_docs.py docs/_build/html
 
       - name: Run examples
         env:

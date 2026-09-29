@@ -26,6 +26,7 @@ All notable changes to QUARTIC2D will be documented in this file.
 - Radial support is read from the public PETAL2D `cutoff_radius` mapping.
 - Numerical backend parameters use established names including `rtol`, `atol`, `subdivisions`, `N`, `h`, `nu`, `n`, `bias`, and `offset`.
 - Cubic interpolation in q space uses not-a-knot boundary conditions; radial-profile cubic interpolation remains natural.
+- Minimum supported SciPy is 1.12, matching the `cumulative_simpson` API used by momentum-support diagnostics.
 - Finite-grid harmonic convergence is checked independently for every retained harmonic before a common resolution is selected.
 
 ### Removed

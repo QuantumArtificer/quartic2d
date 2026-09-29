@@ -39,8 +39,11 @@ python -m pip install -e ".[test,docs,dev,release,ogata]"
 python -m pytest
 python -m ruff check src tests examples benchmarks docs/scripts tools
 python -m benchmarks.gaussian_validation --quick
+python docs/scripts/generate_figures.py examples
+python docs/scripts/generate_example_artifacts.py
 python docs/scripts/check_artifacts.py
 python -m sphinx -W --keep-going -b html docs/source docs/_build/html
+python docs/scripts/check_rendered_docs.py docs/_build/html
 ```
 
 A clean source state gives the following stable end conditions:
@@ -126,10 +129,23 @@ For version 0.1.0 the import block prints
 
 ```text
 0.1.0
-['HankelTransform', 'HarmonicTransform', 'Interaction', '__version__']
+['HankelTransform', 'HarmonicConvergenceResult', 'HarmonicTransform', 'Interaction', 'InteractionConvergenceResult', '__version__']
 ```
 
-## 5. Configure PyPI Trusted Publishing
+## 5. Enable GitHub Pages
+
+Before the first public release, enable GitHub Pages for the repository from
+**Settings → Pages → Build and deployment → Source → GitHub Actions**. The
+`Documentation` workflow builds and validates the Sphinx site on every push to
+`main` and deploys that verified artifact through the `github-pages`
+environment.
+
+`actions/configure-pages` cannot enable Pages with the default `GITHUB_TOKEN`,
+so this repository setting must be enabled once by a maintainer. After enabling
+it, rerun the Documentation workflow and require both its build and deployment
+jobs to pass before tagging a release.
+
+## 6. Configure PyPI Trusted Publishing
 
 The release workflow uses the GitHub environment `pypi` and OIDC Trusted Publishing. Configure the PyPI project or pending publisher with
 
@@ -142,7 +158,7 @@ No long-lived PyPI token is stored in the repository.
 
 Official guidance: [Publishing package distribution releases](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/) and [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/).
 
-## 6. Enable Zenodo before the first tag
+## 7. Enable Zenodo before the first tag
 
 Connect the GitHub account to Zenodo, synchronize repositories, and enable `QuantumArtificer/quartic2d` before publishing the first release tag.
 
@@ -150,7 +166,7 @@ QUARTIC2D uses `CITATION.cff` as the release metadata source. Add `.zenodo.json`
 
 Zenodo guidance: [GitHub integration](https://help.zenodo.org/docs/github/) and [software metadata](https://help.zenodo.org/docs/github/describe-software/).
 
-## 7. Create and push the release tag
+## 8. Create and push the release tag
 
 Commit the fully checked release state, then create an annotated tag:
 
@@ -178,7 +194,7 @@ The workflow performs the following sequence:
 
 A failure before step 5 leaves no PyPI or GitHub release. A PyPI failure prevents creation of the GitHub Release and therefore prevents the Zenodo archive from being triggered by this release path.
 
-## 8. Verify the published release
+## 9. Verify the published release
 
 After the workflow succeeds:
 

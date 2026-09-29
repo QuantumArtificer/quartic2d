@@ -4,6 +4,8 @@ The complete maintainer procedure is documented in `docs/source/development/rele
 
 A release is created from one annotated `vX.Y.Z` tag. The tag starts `.github/workflows/release.yml`, which validates the tagged source, builds and verifies the wheel and source distribution, publishes those exact distributions to PyPI through Trusted Publishing, and only then creates the GitHub Release. If the repository is enabled in Zenodo, that GitHub Release becomes the archived software record.
 
+Before the first release, enable GitHub Pages under **Settings → Pages → Build and deployment → Source → GitHub Actions** and confirm the Documentation workflow passes on `main`. Pages enablement is a one-time repository setting and cannot be performed by `actions/configure-pages` with the default `GITHUB_TOKEN`.
+
 Before tagging, make the package version, `CITATION.cff`, and dated `CHANGELOG.md` heading agree. Run
 
 ```bash
