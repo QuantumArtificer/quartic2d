@@ -1,0 +1,14 @@
+Calibration
+all harmonic searches satisfied: True
+all representative interaction searches satisfied: True
+representative screening lengths: (0.1, 1.0, 10.0)
+common GL4 subdivisions: 1
+
+Production sweep
+screening lengths: 31
+displacements: 41
+channels: 3
+matrix elements evaluated: 3813
+exchange           V(delta=2,r0=0.1)=-0.00034-0.03847j  V(delta=2,r0=10)=+0.00115-0.00349j
+pair hopping       V(delta=2,r0=0.1)=+0.03318+0.00000j  V(delta=2,r0=10)=+0.00278+0.00000j
+correlated hopping V(delta=2,r0=0.1)=+0.02298+0.07449j  V(delta=2,r0=10)=+0.00420+0.00923j

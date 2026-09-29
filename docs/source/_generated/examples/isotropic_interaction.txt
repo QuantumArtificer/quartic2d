@@ -1,0 +1,18 @@
+PETAL2D
+retained modes: [0]
+reconstruction error [%]: 1.218e-14
+domain consistency: 0.99968873
+
+HarmonicTransform
+self-convergence satisfied: True
+analytic relative L2 error: 7.486e-04
+selected q_max: 5.655935
+selected n_q: 19
+
+Interaction
+Coulomb self-convergence satisfied: True
+Rytova-Keldysh self-convergence satisfied: True
+delta=0.0  Coulomb=1.252579  RK=0.769954
+delta=1.0  Coulomb=0.990611  RK=0.658185
+delta=2.0  Coulomb=0.582827  RK=0.460529
+delta=4.0  Coulomb=0.258812  RK=0.244462

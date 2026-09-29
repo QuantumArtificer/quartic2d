@@ -2,8 +2,7 @@ name: Documentation
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -14,48 +13,47 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
+    name: Build documentation
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
-
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
       - name: Install documentation dependencies
-        run: python -m pip install -e ".[docs]"
+        run: python -m pip install -e ".[docs,ogata]"
+      - name: Generate guided-example figures
+        run: python docs/scripts/generate_figures.py examples
+      - name: Generate guided-example runtime artifacts
+        run: python docs/scripts/generate_example_artifacts.py
+      - name: Check documentation artifacts
+        run: python docs/scripts/check_artifacts.py
 
       - name: Build documentation
         run: python -m sphinx -W --keep-going -b html docs/source docs/_build/html
-
-      - name: Configure GitHub Pages
-        if: github.event_name == 'push'
-        uses: actions/configure-pages@v5
-
-      - name: Upload documentation
-        if: github.event_name == 'push'
-        uses: actions/upload-pages-artifact@v4
+      - name: Check rendered documentation
+        run: python docs/scripts/check_rendered_docs.py docs/_build/html
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/_build/html
 
   deploy:
-    if: github.event_name == 'push'
+    name: Deploy documentation
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

@@ -7,6 +7,7 @@ separations against independent direct references, reports finite-rule
 selection efficiency, and explicitly separates FFTLog backend capability from
 FFTLog auto-selector coverage.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,7 +28,6 @@ from benchmarks._interaction_suite import (
     FINITE_METHODS,
     LARGE_DELTA_SUBDIVISIONS,
     build_fields_from_harmonic_results,
-    direct_reference,
     displacement_grid,
     interaction_class,
     interaction_from_parameters,
@@ -258,7 +258,7 @@ def main():
             field = fields[case.workload]
             kernel = kernels[case.kernel]
             print(f"[reference] {domain} | {case.name}", flush=True)
-            low, high, reference_metadata = stable_reference_pair(
+            _low, high, reference_metadata = stable_reference_pair(
                 field,
                 field,
                 kernel,
@@ -288,7 +288,6 @@ def main():
     rows = []
     false_positives = 0
     finite_misses = 0
-    finite_nonminimal = 0
 
     for domain in domains:
         deltas = displacement_grid(n_delta_by_domain[domain], domain=domain)
@@ -345,7 +344,7 @@ def main():
                                 deltas, field, kernel, method, selected_parameters
                             )
                             terminal_error = error_record(terminal.V, reference, tolerance)
-                        except Exception:
+                        except Exception:  # noqa: BLE001 -- terminal probe is best-effort evidence
                             terminal_error = None
 
                     oracle = None
@@ -377,7 +376,6 @@ def main():
                             finite_misses += 1
                             classification = "missed_convergence"
                         elif result.converged and oracle_s is not None and selected_s != oracle_s:
-                            finite_nonminimal += 1
                             classification = "converged_nonminimal"
                         elif result.converged and reference_pass:
                             classification = "converged_minimal"

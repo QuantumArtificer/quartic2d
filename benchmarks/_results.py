@@ -6,13 +6,13 @@ organized by the scientific question each benchmark answers.  Native result
 objects are embedded without numerical transformation so downstream manuscript
 figures consume exactly the same benchmark values.
 """
+
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 from benchmarks._common import write_json
-
 
 SCHEMA_VERSION = 1
 

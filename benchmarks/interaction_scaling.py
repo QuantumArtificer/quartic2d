@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Empirical computational scaling of the public ``Interaction`` constructor."""
+
 from __future__ import annotations
 
 import argparse
@@ -11,10 +12,10 @@ from pathlib import Path
 
 import numpy as np
 
-from quartic2d import HarmonicTransform, Interaction
-
 from benchmarks._common import environment_metadata
 from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
+from quartic2d import HarmonicTransform, Interaction
+
 
 class FieldView:
     def __init__(self, source, modes=None, n_q=None):
@@ -196,7 +197,6 @@ def main():
         return [r for r in rows if r["branch"] == branch and r["axis"] == axis]
 
     fft_nf = select("fftlog", "N_F")
-    tail4 = min(4, len(fft_nf))
     # Fit against N_F log2 N_F for the asymptotic FFT work.
     for r in fft_nf:
         r["N_F_log2_N_F"] = float(r["N_F"] * math.log2(r["N_F"]))

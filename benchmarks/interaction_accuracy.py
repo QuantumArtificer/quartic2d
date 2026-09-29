@@ -8,6 +8,7 @@ performed independently for each backend and requested tolerance.  A high-order
 direct quadrature of the *same fixed q-space interpolants on the same support*
 is evaluated only afterward as an oracle.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -15,11 +16,10 @@ import json
 import statistics
 import time
 from collections import Counter, defaultdict
+from functools import partial
 from pathlib import Path
 
 import numpy as np
-
-from quartic2d import Interaction
 
 from benchmarks._common import environment_metadata
 from benchmarks._interaction_suite import (
@@ -30,12 +30,13 @@ from benchmarks._interaction_suite import (
     build_fields_from_harmonic_results,
     direct_reference,
     displacement_grid,
-    interaction_class,
     interaction_from_parameters,
     kernel_registry,
     relative_l2,
     relative_peak,
 )
+from quartic2d import Interaction
+
 
 def parse_csv(text, cast=str):
     return tuple(cast(item.strip()) for item in text.split(",") if item.strip())
@@ -88,7 +89,7 @@ def summarize(rows):
                 "n_cases": len(items),
                 "n_automatic_converged": len(converged),
                 "n_reference_pass": len(passed),
-                "n_false_positive": int(sum(bool(r["automatic_converged"] and r["reference_pass"] is False) for r in items)),
+                "n_false_positive": sum(bool(r["automatic_converged"] and r["reference_pass"] is False) for r in items),
                 "n_conservative_rejection_oracle_pass": len(conservative_pass),
                 "n_rejected_terminal_oracle_fail": len(terminal_fail),
                 "n_rejected_terminal_oracle_unavailable": len(terminal_unknown),
@@ -266,16 +267,15 @@ def main():
                 failure_status = None
 
                 if convergence.converged:
-                    def build_selected():
-                        return interaction_from_parameters(
-                            deltas,
-                            field,
-                            field,
-                            kernel,
-                            method,
-                            selected_parameters,
-                        )
-
+                    build_selected = partial(
+                        interaction_from_parameters,
+                        deltas,
+                        field,
+                        field,
+                        kernel,
+                        method,
+                        selected_parameters,
+                    )
                     interaction, production_timing = timed(
                         build_selected,
                         warmups=args.warmups,
@@ -404,9 +404,9 @@ def main():
         "group_summary": summarize_groups(rows),
         "validation": {
             "false_positive_convergence": int(false_positives),
-            "conservative_rejections_oracle_pass": int(sum(r.get("terminal_reference_pass") is True for r in rows if not r["automatic_converged"])),
-            "rejections_terminal_oracle_fail": int(sum(r.get("terminal_reference_pass") is False for r in rows if not r["automatic_converged"])),
-            "rejections_terminal_oracle_unavailable": int(sum(r.get("terminal_reference_pass") is None for r in rows if not r["automatic_converged"])),
+            "conservative_rejections_oracle_pass": sum(r.get("terminal_reference_pass") is True for r in rows if not r["automatic_converged"]),
+            "rejections_terminal_oracle_fail": sum(r.get("terminal_reference_pass") is False for r in rows if not r["automatic_converged"]),
+            "rejections_terminal_oracle_unavailable": sum(r.get("terminal_reference_pass") is None for r in rows if not r["automatic_converged"]),
             "passed": bool(false_positives == 0),
         },
     }

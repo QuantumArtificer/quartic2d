@@ -10,7 +10,11 @@ from __future__ import annotations
 from .._numerics import hankel_transform_sampled as _hankel_transform_sampled
 from ..interaction import (
     HankelTransform as _HankelTransform,
+)
+from ..interaction import (
     HarmonicTransform as _HarmonicTransform,
+)
+from ..interaction import (
     Interaction as _Interaction,
 )
 

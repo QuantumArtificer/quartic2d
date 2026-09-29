@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Generate QUARTIC2D manuscript figures and numerical tables.
 
-The main figures follow conventions used in peer-reviewed numerical-method and
-scientific-software papers: direct numerical/reference comparisons with residual
-panels, achieved error versus requested tolerance, estimated versus actual error,
-execution time versus achieved accuracy, and log-log scaling against theoretical
-work measures. Detailed parameter maps, memory, cross-stage, and end-to-end audit
+The main figures follow conventions used in peer-reviewed computational-physics and
+numerical-method papers: direct numerical/reference comparisons with residual panels,
+independent error versus requested numerical threshold, estimator/reference
+comparisons, execution time versus achieved accuracy, and log-log scaling against
+source-derived work measures. Detailed parameter maps, memory, cross-stage, and end-to-end audit
 plots are reserved for the supplement.
 
 Numerical benchmark results are read from the consolidated publication JSON in ``benchmarks/results``.
@@ -14,56 +14,43 @@ analytic benchmark definitions and frozen numerical parameters used by the
 publication benchmarks; no benchmark accuracy value is inferred from those line
 curves. Numerical claims and tables are populated directly from benchmark JSON.
 """
+
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
 import csv
 import json
 import math
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 import numpy as np
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+from matplotlib.lines import Line2D
 from numpy.polynomial.legendre import leggauss
 from scipy.integrate import simpson, trapezoid
 from scipy.interpolate import CubicSpline
 from scipy.special import jv
 
 from benchmarks._results import load_publication_results
+from quartic2d._plot_style import (
+    METHOD_LABELS,
+    METHOD_ORDER,
+    METHOD_STYLES,
+    STATUS_LABELS,
+    STATUS_STYLES,
+)
 
 # -----------------------------------------------------------------------------
 # Style
 # -----------------------------------------------------------------------------
 
 MAIN_WIDTH = 7.0
-METHOD_ORDER = ("trapezoid", "simpson", "gl4", "gl8", "fftlog", "ogata")
-METHOD_LABEL = {
-    "trapezoid": "Trapezoid",
-    "simpson": "Simpson",
-    "gl4": "GL4",
-    "gl8": "GL8",
-    "fftlog": "FFTLog",
-    "ogata": "Ogata",
-}
-METHOD_MARKER = {
-    "trapezoid": "v",
-    "simpson": "o",
-    "gl4": "s",
-    "gl8": "P",
-    "fftlog": "^",
-    "ogata": "D",
-}
-METHOD_LINESTYLE = {
-    "trapezoid": ":",
-    "simpson": "-",
-    "gl4": "--",
-    "gl8": "-.",
-    "fftlog": "-",
-    "ogata": "--",
-}
+METHOD_LABEL = dict(METHOD_LABELS)
+METHOD_MARKER = {method: METHOD_STYLES[method]["marker"] for method in METHOD_ORDER}
+METHOD_LINESTYLE = {method: METHOD_STYLES[method]["linestyle"] for method in METHOD_ORDER}
 CASE_LABEL = {
     "isotropic_coulomb": "isotropic Coulomb",
     "anisotropic_rk_strong": "anisotropic RK",
@@ -109,17 +96,17 @@ def apply_style() -> None:
             "legend.fancybox": False,
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
-            "savefig.dpi": 300,
+            "savefig.dpi": 600,
         }
     )
 
 
 def method_colors() -> dict[str, str]:
-    colors = mpl.rcParams["axes.prop_cycle"].by_key()["color"]
-    return {m: colors[i % len(colors)] for i, m in enumerate(METHOD_ORDER)}
+    """Return the package-wide semantic method colors."""
+    return {method: METHOD_STYLES[method]["color"] for method in METHOD_ORDER}
 
 
-COLORS = None
+COLORS = method_colors()
 
 
 def finish_axis(ax, *, grid: bool = False) -> None:
@@ -147,7 +134,7 @@ def panel_label(ax, label: str, x: float = -0.16, y: float = 1.04) -> None:
 def save_figure(fig, outdir: Path, stem: str, manifest: dict, sources: list[str], note: str) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     fig.savefig(outdir / f"{stem}.pdf", bbox_inches="tight", pad_inches=0.04)
-    fig.savefig(outdir / f"{stem}.png", dpi=300, bbox_inches="tight", pad_inches=0.04)
+    fig.savefig(outdir / f"{stem}.png", dpi=600, bbox_inches="tight", pad_inches=0.04)
     plt.close(fig)
     manifest[stem] = {"sources": sources, "note": note}
 
@@ -172,6 +159,25 @@ def eps_ref(error: dict | None) -> float | None:
 def method_sort(values) -> list[str]:
     values = set(values)
     return [m for m in METHOD_ORDER if m in values] + sorted(values - set(METHOD_ORDER))
+
+
+def selector_status(record: dict) -> str:
+    """Map a convergence record to a presentation-level selector outcome."""
+    if record.get("automatic_converged"):
+        return (
+            "accepted_reference_pass"
+            if record.get("reference_pass")
+            else "accepted_reference_fail"
+        )
+    classification = record.get("classification")
+    if classification in {
+        "selector_miss_backend_capable",
+        "conservative_rejection_terminal_pass",
+    }:
+        return "qualified_after_refusal"
+    if classification == "tested_box_not_capable":
+        return "tested_box_not_capable"
+    return "conservative_refusal"
 
 
 def fmt_e(value) -> str:
@@ -440,7 +446,7 @@ def fig1_workflow(data, outdir, manifest):
     rho = np.exp(-(X*X+Y*Y))*(1+0.35*(X*X-Y*Y))/np.pi
     im = axa.imshow(rho, extent=[xy[0],xy[-1],xy[0],xy[-1]], origin="lower",
                     aspect="equal", cmap="viridis")
-    axa.set_xlabel(r"$x$"); axa.set_ylabel(r"$y$"); axa.set_title("input density", pad=3)
+    axa.set_xlabel(r"$x$"); axa.set_ylabel(r"$y$"); axa.set_title("transition field", pad=3)
     fig.colorbar(im, cax=caxa)
     panel_label(axa,"(a)",x=-0.14,y=1.04)
 
@@ -507,14 +513,14 @@ def fig2_direct_accuracy(data, outdir, manifest):
     gs = GridSpec(2,2,figure=fig,wspace=0.34,hspace=0.36)
 
     # (a) Gaussian m=0 harmonic transform.
-    row, prof, r, q, F = reconstruct_broad_field(harmonic,"gaussian_isotropic",1e-4,"simpson")
+    _row, prof, _r, q, F = reconstruct_broad_field(harmonic,"gaussian_isotropic",1e-4,"simpson")
     qd = np.linspace(0,q[-1],700)
     ref = prof["exact"][0](qd); num=interp_complex(q,F[0],qd).real
     ax,_ = stacked_curve_panel(fig,gs[0,0],qd,ref,num,xlabel=r"$q$",ylabel=r"$F_0(q)$",title="Gaussian harmonic transform")
     panel_label(ax,"(a)")
 
     # (b) Anisotropic m=2 harmonic transform.
-    row2, prof2, r2, q2, F2 = reconstruct_broad_field(harmonic,"gaussian_anisotropic_m2",1e-4,"simpson")
+    _row2, prof2, _r2, q2, F2 = reconstruct_broad_field(harmonic,"gaussian_anisotropic_m2",1e-4,"simpson")
     qd2=np.linspace(0,q2[-1],700)
     ref2=prof2["exact"][2](qd2); num2=interp_complex(q2,F2[2],qd2).real
     ax,_=stacked_curve_panel(fig,gs[0,1],qd2,ref2,num2,xlabel=r"$q$",ylabel=r"$F_2(q)$",title="Anisotropic harmonic transform")
@@ -531,7 +537,7 @@ def fig2_direct_accuracy(data, outdir, manifest):
     panel_label(ax,"(c)")
 
     # (d) Nodal RPA cusp.
-    rown, profn, rn, qn, Fn = reconstruct_broad_field(harmonic,"nodal_mixed",1e-4,"simpson")
+    _rown, profn, _rn, qn, Fn = reconstruct_broad_field(harmonic,"nodal_mixed",1e-4,"simpson")
     rconvn = next(r for r in conv["rows"] if r["delta_domain"]=="standard" and r["case"]=="nodal_rpa" and r["method"]=="gl4")
     subn=int(rconvn["selected_parameters"]["subdivisions"])
     Vn=interaction_from_sampled_field(qn,Fn,profn["modes"],deltas,"rpa_2deg_kf1_qtf1",method="gl4",subdivisions=subn)
@@ -567,110 +573,127 @@ def estimate_selected_l2(row: dict) -> float | None:
     return vals[-1] if vals else None
 
 
-def fig3_error_control(data,outdir,manifest):
-    broad=data["interaction_accuracy"]; conv=data["interaction_convergence"]
-    fig,axs=plt.subplots(1,3,figsize=(MAIN_WIDTH,2.62),gridspec_kw={"wspace":0.38})
+def fig3_error_control(data, outdir, manifest):
+    broad = data["interaction_accuracy"]
+    conv = data["interaction_convergence"]
+    fig, axs = plt.subplots(2, 2, figsize=(MAIN_WIDTH, 5.15),
+                            gridspec_kw={"wspace": 0.34, "hspace": 0.42})
 
-    # (a) requested vs achieved error, analogous to FINUFFT Fig. 4.1.
-    ax=axs[0]
-    methods=method_sort(r["method"] for r in broad["rows"])
-    offsets={m:10**((i-(len(methods)-1)/2)*0.035) for i,m in enumerate(methods)}
-    ymax=0.0
+    # (a) Requested selector threshold versus independent reference error.
+    ax = axs[0, 0]
+    methods = method_sort(r["method"] for r in broad["rows"])
+    offsets = {m: 10 ** ((i - (len(methods) - 1) / 2) * 0.035)
+               for i, m in enumerate(methods)}
+    ymax = 0.0
     for m in methods:
-        rr=[r for r in broad["rows"] if r["method"]==m and r.get("reference_pass")]
-        x=[];y=[]
+        rr = [r for r in broad["rows"] if r["method"] == m and r.get("reference_pass")]
+        x, y = [], []
         for r in rr:
-            e=eps_ref(r.get("selected_reference_error"))
-            if e and e>0:
-                x.append(float(r["requested_tolerance"])*offsets[m]); y.append(e); ymax=max(ymax,e)
+            e = eps_ref(r.get("selected_reference_error"))
+            if e and e > 0:
+                x.append(float(r["requested_tolerance"]) * offsets[m])
+                y.append(e)
+                ymax = max(ymax, e)
         if x:
-            ax.scatter(x,y,s=10,alpha=0.38,marker=METHOD_MARKER[m],label=METHOD_LABEL[m],color=COLORS[m],linewidths=0.3)
-            for tol in sorted(set(float(r["requested_tolerance"]) for r in rr)):
-                vals=np.array([eps_ref(r.get("selected_reference_error")) for r in rr if float(r["requested_tolerance"])==tol and eps_ref(r.get("selected_reference_error"))],float)
+            ax.scatter(x, y, s=10, alpha=0.34, marker=METHOD_MARKER[m],
+                       label=METHOD_LABEL[m], color=COLORS[m], linewidths=0.3)
+            for tol in sorted({float(r["requested_tolerance"]) for r in rr}):
+                vals = np.array([
+                    eps_ref(r.get("selected_reference_error"))
+                    for r in rr
+                    if float(r["requested_tolerance"]) == tol
+                    and eps_ref(r.get("selected_reference_error"))
+                ], float)
                 if vals.size:
-                    med=float(np.median(vals)); ymax=max(ymax,med)
-                    ax.scatter([tol*offsets[m]],[med],s=31,marker=METHOD_MARKER[m],color=COLORS[m],edgecolors="black",linewidths=0.45,zorder=4)
-    xx=np.logspace(-5.2,-2.7,100); ax.plot(xx,xx,color="0.25",linewidth=0.9)
-    ax.text(1.65e-5,3.2e-5,r"$\epsilon_{\rm ref}=\epsilon_{\rm req}$",fontsize=6.1,rotation=28,ha="left",va="bottom",color="0.25")
-    ax.set_xscale("log");ax.set_yscale("log");ax.set_xlabel(r"requested $\epsilon_{\rm req}$");ax.set_ylabel(r"achieved $\epsilon_{\rm ref}$")
-    # Reserve a clear legend band above all measured points rather than covering
-    # the first tolerance column.
-    ax.set_ylim(top=max(2.0e-2, ymax*20.0))
-    boxed_legend(ax, loc="upper left", fontsize=6.1, ncol=1)
-    finish_axis(ax,grid=True);panel_label(ax,"(a)")
+                    med = float(np.median(vals))
+                    ymax = max(ymax, med)
+                    ax.scatter([tol * offsets[m]], [med], s=31, marker=METHOD_MARKER[m],
+                               color=COLORS[m], edgecolors="black", linewidths=0.45, zorder=4)
+    guide = np.logspace(-5.2, -2.7, 100)
+    ax.plot(guide, guide, color="0.35", linewidth=0.85, linestyle=":")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"requested $\mathrm{rtol}$")
+    ax.set_ylabel(r"independent $\epsilon_{\rm ref}$")
+    ax.set_ylim(top=max(2.0e-2, ymax * 18.0))
+    boxed_legend(ax, loc="upper left", fontsize=5.7, ncol=2,
+                 borderpad=0.3, columnspacing=0.8, handlelength=1.4)
+    finish_axis(ax, grid=True)
+    panel_label(ax, "(a)")
 
-    # (b) estimated vs actual finite-rule error, analogous to Diehl--Grocholski Fig. 12.
-    ax=axs[1]
-    allv=[]
-    for m in ("simpson","gl4"):
-        xxv=[];yyv=[]
+    # (b) Finite-rule estimate versus independent error.
+    ax = axs[0, 1]
+    allv = []
+    for m in ("simpson", "gl4"):
+        xxv, yyv = [], []
         for r in conv["rows"]:
-            if r["method"]!=m or not r.get("reference_pass"): continue
-            est=estimate_selected_l2(r); actual=(r.get("selected_reference_error") or {}).get("relative_l2")
-            if est is not None and actual is not None and est>0 and float(actual)>0:
-                xxv.append(est);yyv.append(float(actual));allv.extend([est,float(actual)])
-        ax.scatter(xxv,yyv,marker=METHOD_MARKER[m],label=METHOD_LABEL[m],color=COLORS[m])
-    lo=min(allv)*0.7;hi=max(allv)*1.4
-    ax.plot([lo,hi],[lo,hi],color="0.25",linewidth=0.9)
-    ax.set_xscale("log");ax.set_yscale("log");ax.set_xlabel("estimated relative $L_2$ error");ax.set_ylabel("actual relative $L_2$ error")
-    boxed_legend(ax, loc="upper left")
-    finish_axis(ax,grid=True);panel_label(ax,"(b)")
+            if r["method"] != m or not r.get("reference_pass"):
+                continue
+            est = estimate_selected_l2(r)
+            actual = (r.get("selected_reference_error") or {}).get("relative_l2")
+            if est is not None and actual is not None and est > 0 and float(actual) > 0:
+                xxv.append(est)
+                yyv.append(float(actual))
+                allv.extend([est, float(actual)])
+        ax.scatter(xxv, yyv, marker=METHOD_MARKER[m], color=COLORS[m],
+                   label=METHOD_LABEL[m], s=24)
+    lo = min(allv) * 0.7
+    hi = max(allv) * 1.4
+    ax.plot([lo, hi], [lo, hi], color="0.35", linewidth=0.85, linestyle=":")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"estimated relative $L^2$ change")
+    ax.set_ylabel(r"independent relative $L^2$ error")
+    boxed_legend(ax, loc="upper left", fontsize=6.2)
+    finish_axis(ax, grid=True)
+    panel_label(ax, "(b)")
 
-    # (c) classification counts, preserving conservative refusal vs incapability.
-    ax=axs[2]
-    methods=method_sort(r["method"] for r in conv["rows"])
-    categories=("correct certificate","conservative refusal / miss","selector miss but capable","tested box not capable","false positive")
-    counts={m:Counter() for m in methods}
-    for r in conv["rows"]:
-        m=r["method"];cl=r["classification"]
-        if r.get("automatic_converged") and r.get("reference_pass"):
-            k="correct certificate"
-        elif r.get("automatic_converged") and not r.get("reference_pass"):
-            k="false positive"
-        elif cl=="selector_miss_backend_capable":
-            k="selector miss but capable"
-        elif cl=="tested_box_not_capable":
-            k="tested box not capable"
-        else:
-            k="conservative refusal / miss"
-        counts[m][k]+=1
-    bottom=np.zeros(len(methods))
-    cat_colors=mpl.rcParams["axes.prop_cycle"].by_key()["color"]
-    for i,k in enumerate(categories):
-        vals=np.array([counts[m][k] for m in methods],float)
-        if vals.any():
-            ax.bar(np.arange(len(methods)),vals,bottom=bottom,width=0.72,label=k,color=cat_colors[i%len(cat_colors)])
-            bottom+=vals
-    ax.set_xticks(np.arange(len(methods)),[METHOD_LABEL[m] for m in methods],rotation=0,ha="center")
-    ax.set_ylabel("cases")
-    ymax=float(max(bottom))
-    # Short display labels keep the framed legend entirely inside the bar axes.
-    handles, labels = ax.get_legend_handles_labels()
-    display = {
-        "correct certificate": "correct certificate",
-        "conservative refusal / miss": "conservative refusal/miss",
-        "selector miss but capable": "selector miss (capable)",
-        "tested box not capable": "tested box incapable",
-    }
-    ax.set_ylim(0,ymax*1.95)
-    boxed_legend(ax, handles, [display.get(l,l) for l in labels], loc="upper right",
-                 fontsize=5.25, ncol=1, borderpad=0.35, handlelength=1.5)
-    # The upper half of the axes is intentionally reserved for annotations and
-    # the legend; keep the zero-false-positive statement clear of the bars.
-    ax.text(0.04,0.94,"false positives = 0",transform=ax.transAxes,
-            ha="left",va="top",fontsize=6.4)
-    finish_axis(ax,grid=False);panel_label(ax,"(c)")
+    # (c,d) Case-level selector outcomes, separated by displacement domain.
+    cases = ("isotropic_coulomb", "anisotropic_rk_strong", "complex_gate", "nodal_rpa")
+    methods = ("simpson", "gl4", "fftlog", "ogata")
+    for ax, domain, label in zip(axs[1], ("standard", "large"), ("(c)", "(d)")):
+        for i, case in enumerate(cases):
+            for j, method in enumerate(methods):
+                record = next(r for r in conv["rows"]
+                              if r["delta_domain"] == domain
+                              and r["case"] == case and r["method"] == method)
+                status = selector_status(record)
+                style = STATUS_STYLES[status]
+                kwargs = {"marker": style["marker"], "s": 37, "linewidths": 1.0, "zorder": 3}
+                if style.get("fillstyle") == "none" and style["marker"] != "x":
+                    kwargs.update(facecolors="none", edgecolors=style["color"])
+                else:
+                    kwargs.update(color=style["color"])
+                ax.scatter(j, i, **kwargs)
+        ax.set_xticks(range(len(methods)), [METHOD_LABEL[m] for m in methods], rotation=25, ha="right")
+        ax.set_xlim(-0.5, len(methods) - 0.5)
+        ax.set_ylim(len(cases) - 0.5, -0.5)
+        ax.set_title("standard displacement" if domain == "standard" else "large displacement", pad=3)
+        ax.grid(True, color="0.90", linewidth=0.55)
+        ax.set_axisbelow(True)
+        panel_label(ax, label)
+    axs[1, 0].set_yticks(range(len(cases)), [CASE_LABEL[c] for c in cases])
+    axs[1, 1].set_yticks(range(len(cases)), [])
 
-    fig.subplots_adjust(left=0.08,right=0.99,bottom=0.18,top=0.94,wspace=0.40)
-    save_figure(fig,outdir,"figure03_automatic_error_control",manifest,
-                ["interaction_accuracy.json :: sections.broad_accuracy_and_timing","interaction_convergence.json :: sections.primary_tolerance"],
-                "Requested versus achieved error, finite-rule estimator validation, and certification outcomes.")
-
-
-# -----------------------------------------------------------------------------
-# Main Figure 4: execution time versus achieved accuracy
-# -----------------------------------------------------------------------------
-
+    status_handles = []
+    for status in ("accepted_reference_pass", "qualified_after_refusal",
+                   "conservative_refusal", "tested_box_not_capable"):
+        style = STATUS_STYLES[status]
+        kwargs = {"marker": style["marker"], "linestyle": "none",
+                  "label": STATUS_LABELS[status], "color": style["color"]}
+        if style.get("fillstyle") == "none" and style["marker"] != "x":
+            kwargs.update(markerfacecolor="none", markeredgecolor=style["color"])
+        status_handles.append(Line2D([0], [0], **kwargs))
+    fig.legend(status_handles, [h.get_label() for h in status_handles],
+               loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.005),
+               frameon=False, fontsize=5.8, columnspacing=1.0, handletextpad=0.4)
+    fig.subplots_adjust(left=0.10, right=0.99, bottom=0.18, top=0.96)
+    save_figure(
+        fig, outdir, "figure03_automatic_error_control", manifest,
+        ["interaction_accuracy.json :: sections.broad_accuracy_and_timing",
+         "interaction_convergence.json :: sections.primary_tolerance"],
+        "Requested self-convergence threshold versus independent error, finite-rule estimator validation, and case-level selector outcomes in standard and large-displacement domains.",
+    )
 
 def standard_accuracy_cost_points(accuracy, matrix, case_name):
     points=[]
@@ -727,7 +750,6 @@ def fig4_accuracy_cost(data,outdir,manifest):
         accuracy_cost_panel(axs[1,j],pts,title,label_points=False)
         panel_label(axs[1,j],f"({chr(99+j)})")
         axs[1,j].axvline(1e-3,color="0.45",linewidth=0.8,linestyle=":")
-    handles,labels=axs[0,0].get_legend_handles_labels()
     # Collect all methods from all panels in canonical order.
     hd={}
     for ax in axs.flat:
@@ -843,90 +865,107 @@ def fig5_scaling_reuse(data,outdir,manifest):
 # -----------------------------------------------------------------------------
 
 
-def figS1_harmonic_validation(data,outdir,manifest):
-    d=data["harmonic_transform"]
-    fig,axs=plt.subplots(1,3,figsize=(MAIN_WIDTH,2.55),sharey=True,gridspec_kw={"wspace":0.15})
-    tolerances=sorted(d["summary"]["requested_tolerances"],reverse=True)
-    for ax,tol,label in zip(axs,tolerances,["(a)","(b)","(c)"]):
-        rows=[r for r in d["rows"] if float(r["target"])==float(tol) and not r["stress"]]
-        names=[r["workload"].replace("gaussian_","").replace("_"," ") for r in rows]
-        x=np.arange(len(rows), dtype=float)
-        offsets={"simpson":-0.11,"gl4":0.11}
-        for m in ("simpson","gl4"):
-            y=[]
-            for r in rows:
-                mr=(r.get("methods") or {}).get(m,{})
-                if mr.get("status")=="complete": y.append(max(float(mr["worst_in_domain_relative_l2_total_norm"]),float(mr["worst_in_domain_relative_max_peak"])))
-                else: y.append(np.nan)
-            y=np.asarray(y,float)
-            mask=np.isfinite(y)
-            ax.scatter(x[mask]+offsets[m],y[mask],marker=METHOD_MARKER[m],label=METHOD_LABEL[m],color=COLORS[m],s=24,zorder=3)
-        ax.axhline(float(tol),color="0.35",linestyle=":",linewidth=0.8,label="requested tolerance" if label=="(a)" else None)
-        ax.set_yscale("log");ax.set_xticks(x,names,rotation=60,ha="right",fontsize=6.4);ax.set_title(fr"$\epsilon_{{\rm req}}={tol:.0e}$")
-        finish_axis(ax,grid=True);panel_label(ax,label)
-    axs[0].set_ylabel(r"achieved $\epsilon_{\rm ref}$")
-    handles,labels=axs[0].get_legend_handles_labels()
-    axs[2].legend(handles,labels,loc="upper right",fontsize=6.2)
-    fig.subplots_adjust(bottom=0.33)
-    save_figure(fig,outdir,"figureS01_harmonic_validation",manifest,["harmonic.json :: sections.reference_accuracy_and_tolerance_response"],"Per-workload HarmonicTransform accuracy at the three requested tolerances.")
+def figS1_harmonic_validation(data, outdir, manifest):
+    d = data["harmonic_transform"]
+    fig, axs = plt.subplots(1, 3, figsize=(MAIN_WIDTH, 3.25), sharey=True,
+                            gridspec_kw={"wspace": 0.12})
+    tolerances = sorted(d["summary"]["requested_tolerances"], reverse=True)
+    workload_order = []
+    for row in d["rows"]:
+        if row["stress"]:
+            continue
+        if row["workload"] not in workload_order:
+            workload_order.append(row["workload"] )
+    labels = [name.replace("gaussian_", "").replace("_", " ") for name in workload_order]
+    y = np.arange(len(workload_order), dtype=float)
+    offsets = {"simpson": -0.10, "gl4": 0.10}
+    for ax, tol, label in zip(axs, tolerances, ("(a)", "(b)", "(c)")):
+        rows = [r for r in d["rows"] if float(r["target"]) == float(tol) and not r["stress"]]
+        for method in ("simpson", "gl4"):
+            xvals, yvals = [], []
+            for i, workload in enumerate(workload_order):
+                row = next(r for r in rows if r["workload"] == workload)
+                result = (row.get("methods") or {}).get(method, {})
+                if result.get("status") != "complete":
+                    continue
+                err = max(float(result["worst_in_domain_relative_l2_total_norm"]),
+                          float(result["worst_in_domain_relative_max_peak"]))
+                xvals.append(err)
+                yvals.append(i + offsets[method])
+            ax.scatter(xvals, yvals, marker=METHOD_MARKER[method], color=COLORS[method],
+                       s=25, label=METHOD_LABEL[method], zorder=3)
+        ax.axvline(float(tol), color="0.35", linestyle=":", linewidth=0.8)
+        ax.set_xscale("log")
+        ax.set_xlabel(r"independent $\epsilon_{\rm ref}$")
+        ax.set_title(fr"requested $\mathrm{{rtol}}={tol:.0e}$", pad=3)
+        finish_axis(ax, grid=True)
+        panel_label(ax, label)
+    axs[0].set_yticks(y, labels)
+    axs[0].invert_yaxis()
+    for ax in axs[1:]:
+        ax.tick_params(labelleft=False)
+    handles = [Line2D([0], [0], color=COLORS[m], marker=METHOD_MARKER[m],
+                      linestyle="none", label=METHOD_LABEL[m]) for m in ("simpson", "gl4")]
+    handles.append(Line2D([0], [0], color="0.35", linestyle=":", label="requested level"))
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.995),
+               ncol=3, frameon=False, fontsize=6.2)
+    fig.subplots_adjust(top=0.82, bottom=0.18, left=0.20, right=0.99)
+    save_figure(
+        fig, outdir, "figureS01_harmonic_validation", manifest,
+        ["harmonic.json :: sections.reference_accuracy_and_tolerance_response"],
+        "Per-workload HarmonicTransform independent-reference accuracy at three requested self-convergence levels.",
+    )
 
+def figS2_interaction_distributions(data, outdir, manifest):
+    d = data["interaction_accuracy"]
+    fig, axs = plt.subplots(1, 3, figsize=(MAIN_WIDTH, 2.75), sharey=True,
+                            gridspec_kw={"wspace": 0.18})
+    tols = sorted({float(r["requested_tolerance"]) for r in d["rows"]}, reverse=True)
+    methods = method_sort(r["method"] for r in d["rows"])
 
-def figS2_interaction_distributions(data,outdir,manifest):
-    d=data["interaction_accuracy"]
-    fig,axs=plt.subplots(1,3,figsize=(MAIN_WIDTH,2.55),sharey=False,gridspec_kw={"wspace":0.27})
-    tols=sorted(set(float(r["requested_tolerance"]) for r in d["rows"]),reverse=True)
-    methods=method_sort(r["method"] for r in d["rows"])
-    offsets={m:(i-(len(methods)-1)/2)*0.16 for i,m in enumerate(methods)}
-
-    for ax,tol,label in zip(axs,tols,["(a)","(b)","(c)"]):
-        tol_rows=[r for r in d["rows"] if float(r["requested_tolerance"])==tol]
-        # Preserve the benchmark's categorical case order; the horizontal axis
-        # is an index only and carries no progression/continuity meaning.
-        case_order=[]
+    for ax, tol, label in zip(axs, tols, ("(a)", "(b)", "(c)")):
+        tol_rows = [r for r in d["rows"] if float(r["requested_tolerance"]) == tol]
+        case_order = []
         for r in tol_rows:
             if r["case"] not in case_order:
                 case_order.append(r["case"])
-        case_index={c:i+1 for i,c in enumerate(case_order)}
-        all_errors=[]
-        for m in methods:
-            rr=[r for r in tol_rows if r["method"]==m and r.get("reference_pass")]
-            xx=[]; yy=[]
-            for r in rr:
-                e=eps_ref(r.get("selected_reference_error"))
-                if e is None or not np.isfinite(e) or e<=0:
+        total_cases = len(case_order)
+        for method in methods:
+            errors = []
+            for r in tol_rows:
+                if r["method"] != method or not r.get("reference_pass"):
                     continue
-                xx.append(case_index[r["case"]]+offsets[m]); yy.append(e); all_errors.append(e)
-            # Keep the method in the legend even when it has zero qualified
-            # points at a stringent target (e.g. FFTLog at 1e-5).
-            ax.scatter(xx,yy,s=11,alpha=0.72,marker=METHOD_MARKER[m],color=COLORS[m],
-                       label=METHOD_LABEL[m],linewidths=0.25)
-        ax.axhline(tol,color="0.25",linestyle=":",linewidth=0.9,label="requested tolerance")
-        ax.set_yscale("log")
-        if all_errors:
-            ymin=min(all_errors)/3.0
-            ymax=max(tol*3.0,max(all_errors)*2.2)
-            ax.set_ylim(ymin,ymax)
-        ax.set_xlim(0.4,len(case_order)+0.6)
-        ticks=[1,20,40,60,len(case_order)] if len(case_order)>=60 else np.linspace(1,len(case_order),5,dtype=int).tolist()
-        ticks=sorted(set(int(t) for t in ticks if 1<=int(t)<=len(case_order)))
-        ax.set_xticks(ticks)
-        ax.set_xlabel("benchmark case index")
-        ax.set_title(fr"$\epsilon_{{\rm req}}={tol:.0e}$",pad=3)
-        finish_axis(ax,grid=True);panel_label(ax,label)
-    axs[0].set_ylabel(r"achieved $\epsilon_{\rm ref}$")
-    # One framed figure legend avoids obscuring any of the dense categorical points.
-    h,l=axs[0].get_legend_handles_labels()
-    fig.legend(h,l,loc="upper center",bbox_to_anchor=(0.5,0.995),ncol=4,fontsize=5.9,
-               frameon=True,framealpha=1.0,facecolor="white",edgecolor="black",
-               columnspacing=0.9,handlelength=1.5,borderpad=0.35)
-    fig.subplots_adjust(top=0.80,bottom=0.19,left=0.08,right=0.99,wspace=0.28)
-    save_figure(fig,outdir,"figureS02_interaction_accuracy_distributions",manifest,["interaction_accuracy.json :: sections.broad_accuracy_and_timing"],
-                "Per-case achieved Interaction error over the 74-case fixed-field suite. Cases are categorical and are not connected; methods with incomplete qualification therefore show fewer points.")
-
+                value = eps_ref(r.get("selected_reference_error"))
+                if value is not None and np.isfinite(value) and value > 0:
+                    errors.append(float(value))
+            errors = np.sort(np.asarray(errors, dtype=float))
+            if errors.size:
+                cumulative = np.arange(1, errors.size + 1, dtype=float) / total_cases
+                ax.step(errors, cumulative, where="post", color=COLORS[method],
+                        linestyle=METHOD_LINESTYLE[method], label=METHOD_LABEL[method])
+        ax.axvline(tol, color="0.35", linestyle=":", linewidth=0.8)
+        ax.set_xscale("log")
+        ax.set_ylim(0.0, 1.03)
+        ax.set_xlabel(r"independent $\epsilon_{\rm ref}$")
+        ax.set_title(fr"requested $\mathrm{{rtol}}={tol:.0e}$", pad=3)
+        finish_axis(ax, grid=True)
+        panel_label(ax, label)
+    axs[0].set_ylabel("fraction of 74 cases reference-qualified")
+    handles = [Line2D([0], [0], color=COLORS[m], linestyle=METHOD_LINESTYLE[m], label=METHOD_LABEL[m])
+               for m in methods]
+    handles.append(Line2D([0], [0], color="0.35", linestyle=":", label="requested level"))
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.995),
+               ncol=3, fontsize=5.9, frameon=False, columnspacing=0.9, handlelength=1.6)
+    fig.subplots_adjust(top=0.80, bottom=0.20, left=0.08, right=0.99, wspace=0.20)
+    save_figure(
+        fig, outdir, "figureS02_interaction_accuracy_distributions", manifest,
+        ["interaction_accuracy.json :: sections.broad_accuracy_and_timing"],
+        "Cumulative independent-reference accuracy and coverage over the 74-case fixed-field suite. Curves plateau below one when a method has fewer reference-qualified cases in the declared search.",
+    )
 
 def fftlog_heatmap(ax,row,title):
     hist=(row.get("capability") or {}).get("history") or []
-    ns=sorted(set(int(h["n"]) for h in hist));bs=sorted(set(float(h["bias"]) for h in hist))
+    ns=sorted({int(h["n"]) for h in hist});bs=sorted({float(h["bias"]) for h in hist})
     z=np.full((len(ns),len(bs)),np.nan)
     for h in hist:
         i=ns.index(int(h["n"]));j=bs.index(float(h["bias"]));z[i,j]=math.log10(max(float(h["relative_l2"]),float(h["relative_peak"])))
@@ -936,7 +975,7 @@ def fftlog_heatmap(ax,row,title):
     return im
 
 
-def figS3_backend_parameters(data,outdir,manifest):
+def figS3_numerical_method_parameters(data,outdir,manifest):
     d=data["interaction_convergence"]
     fig,axs=plt.subplots(2,2,figsize=(MAIN_WIDTH,5.0),gridspec_kw={"wspace":0.38,"hspace":0.42})
     r1=next(r for r in d["rows"] if r["delta_domain"]=="standard" and r["case"]=="nodal_rpa" and r["method"]=="fftlog")
@@ -958,62 +997,133 @@ def figS3_backend_parameters(data,outdir,manifest):
         ax.plot(hs,Ns,marker="o",label=r"selected $N$")
         ax.set_xscale("log");ax.set_yscale("log");ax.invert_xaxis();ax.set_xlabel(r"Ogata $h$");ax.set_ylabel(r"selected $N$");ax.set_title(f"Ogata: large-$\\delta$ {CASE_LABEL[case]}",pad=3)
         finish_axis(ax,grid=True);panel_label(ax,label)
-    save_figure(fig,outdir,"figureS03_backend_parameter_sensitivity",manifest,["interaction_convergence.json :: sections.primary_tolerance"],"FFTLog bounded capability maps and Ogata coupled h-N refinement paths.")
+    save_figure(fig,outdir,"figureS03_numerical_method_parameter_sensitivity",manifest,["interaction_convergence.json :: sections.primary_tolerance"],"FFTLog bounded capability maps and Ogata coupled h-N refinement paths for specialist numerical methods.")
 
 
-def figS4_cross_stage_and_refusal(data,outdir,manifest):
-    std=data["cross_stage_standard"];large=data["cross_stage_large"]
-    fig,axs=plt.subplots(1,3,figsize=(MAIN_WIDTH,2.65),gridspec_kw={"wspace":0.38})
-    ax=axs[0]
-    for m in ("simpson","gl4"):
-        vals=np.array([max(float(r["relative_l2"]),float(r["relative_peak"])) for r in std["rows"] if r["method"]==m and r.get("reference_pass")],float)
-        vals=np.sort(vals);cdf=np.arange(1,len(vals)+1)/len(vals);ax.step(vals,cdf,where="post",label=METHOD_LABEL[m],color=COLORS[m])
-    ax.axvline(1e-4,color="0.35",linestyle=":",linewidth=.8);ax.set_xscale("log");ax.set_xlabel(r"cross-stage $\epsilon_{\rm ref}$");ax.set_ylabel("fraction of cases");ax.legend();finish_axis(ax,grid=True);panel_label(ax,"(a)")
+def figS4_cross_stage_and_refusal(data, outdir, manifest):
+    std = data["cross_stage_standard"]
+    large = data["cross_stage_large"]
+    fig, axs = plt.subplots(1, 3, figsize=(MAIN_WIDTH, 2.75),
+                            gridspec_kw={"wspace": 0.38})
 
-    ax=axs[1]
-    cases=["isotropic_coulomb","anisotropic_rk_strong","nodal_rpa","complex_gate"]
-    x=np.arange(len(cases))
-    for m in ("simpson","gl4","fftlog","ogata"):
-        yy=[];xx=[]
-        for i,c in enumerate(cases):
-            r=next(r for r in large["rows"] if r["method"]==m and r["case"]==CROSS_CASE_ID[c])
-            if r.get("reference_pass"):
-                xx.append(i);yy.append(max(float(r["relative_l2"]),float(r["relative_peak"])))
-        if xx:ax.scatter(xx,yy,marker=METHOD_MARKER[m],label=METHOD_LABEL[m],color=COLORS[m])
-    ax.axhline(1e-4,color="0.35",linestyle=":",linewidth=.8);ax.set_yscale("log");ax.set_xticks(x,[CASE_LABEL[c] for c in cases],rotation=35,ha="right",fontsize=6.6);ax.set_ylabel(r"successful $\epsilon_{\rm ref}$");ax.legend(fontsize=6.2);finish_axis(ax,grid=True);panel_label(ax,"(b)")
+    ax = axs[0]
+    for method in ("simpson", "gl4"):
+        vals = np.sort(np.array([
+            max(float(r["relative_l2"]), float(r["relative_peak"]))
+            for r in std["rows"] if r["method"] == method and r.get("reference_pass")
+        ], float))
+        cdf = np.arange(1, len(vals) + 1) / len(vals)
+        ax.step(vals, cdf, where="post", label=METHOD_LABEL[method],
+                color=COLORS[method], linestyle=METHOD_LINESTYLE[method])
+    ax.axvline(1e-4, color="0.35", linestyle=":", linewidth=.8)
+    ax.set_xscale("log")
+    ax.set_xlabel(r"cross-stage $\epsilon_{\rm ref}$")
+    ax.set_ylabel("fraction of cases")
+    finish_axis(ax, grid=True)
+    panel_label(ax, "(a)")
 
-    ax=axs[2]
-    # GL4 q-boundary robustness values; this directly shows the intentional refusal.
-    vals=[];labs=[]
-    for c in cases:
-        r=next(r for r in large["rows"] if r["method"]=="gl4" and r["case"]==CROSS_CASE_ID[c])
-        qb=r.get("q_boundary_robustness") or {}
-        v=qb.get("relative_l2_change")
-        if v is not None:
-            vals.append(float(v));labs.append(CASE_LABEL[c])
-        elif qb.get("status")=="upstream_q_boundary_not_robust":
-            # The failed probe still stores its metric in the convergence metadata.
-            meta=((r.get("convergence") or {}).get("search") or {}).get("metadata",{}).get("q_boundary_robustness",{})
-            if meta.get("relative_l2_change") is not None:
-                vals.append(float(meta["relative_l2_change"]));labs.append(CASE_LABEL[c])
-    ax.bar(np.arange(len(vals)),vals,width=.65)
-    ax.axhline(5e-5,color="0.35",linestyle=":",linewidth=.8,label="boundary budget")
-    ax.set_yscale("log");ax.set_xticks(np.arange(len(vals)),labs,rotation=35,ha="right",fontsize=6.6);ax.set_ylabel("q-boundary relative change");ax.legend(fontsize=6.3);finish_axis(ax,grid=True);panel_label(ax,"(c)")
-    fig.subplots_adjust(bottom=.27)
-    save_figure(fig,outdir,"figureS04_cross_stage_and_safe_refusal",manifest,["pipeline.json :: sections.cross_stage_standard_delta","pipeline.json :: sections.cross_stage_large_delta"],"Cross-stage accuracy and the explicit large-delta upstream q-boundary safeguard.")
+    ax = axs[1]
+    cases = ["isotropic_coulomb", "anisotropic_rk_strong", "nodal_rpa", "complex_gate"]
+    x = np.arange(len(cases))
+    for method in ("simpson", "gl4", "fftlog", "ogata"):
+        yy, xx = [], []
+        for i, case in enumerate(cases):
+            record = next(r for r in large["rows"]
+                          if r["method"] == method and r["case"] == CROSS_CASE_ID[case])
+            if record.get("reference_pass"):
+                xx.append(i)
+                yy.append(max(float(record["relative_l2"]), float(record["relative_peak"])))
+        if xx:
+            ax.scatter(xx, yy, marker=METHOD_MARKER[method], color=COLORS[method], s=22)
+    ax.axhline(1e-4, color="0.35", linestyle=":", linewidth=.8)
+    ax.set_yscale("log")
+    ax.set_xticks(x, [CASE_LABEL[c] for c in cases], rotation=35, ha="right", fontsize=6.4)
+    ax.set_ylabel(r"qualified $\epsilon_{\rm ref}$")
+    finish_axis(ax, grid=True)
+    panel_label(ax, "(b)")
 
+    ax = axs[2]
+    vals, labs = [], []
+    for case in cases:
+        record = next(r for r in large["rows"]
+                      if r["method"] == "gl4" and r["case"] == CROSS_CASE_ID[case])
+        qb = record.get("q_boundary_robustness") or {}
+        value = qb.get("relative_l2_change")
+        if value is None and qb.get("status") == "upstream_q_boundary_not_robust":
+            meta = ((record.get("convergence") or {}).get("search") or {}).get("metadata", {}).get("q_boundary_robustness", {})
+            value = meta.get("relative_l2_change")
+        if value is not None:
+            vals.append(float(value))
+            labs.append(CASE_LABEL[case])
+    ax.bar(np.arange(len(vals)), vals, width=.65, color="0.65")
+    ax.axhline(5e-5, color="0.35", linestyle=":", linewidth=.8)
+    ax.text(0.03, 5e-5 * 1.10, "boundary budget", transform=ax.get_yaxis_transform(),
+            fontsize=6.2, color="0.35", va="bottom")
+    ax.set_yscale("log")
+    ax.set_xticks(np.arange(len(vals)), labs, rotation=35, ha="right", fontsize=6.4)
+    ax.set_ylabel(r"q-boundary relative $L^2$ change")
+    finish_axis(ax, grid=True)
+    panel_label(ax, "(c)")
 
-def figS5_end_to_end(data,outdir,manifest):
-    fig,axs=plt.subplots(1,2,figsize=(MAIN_WIDTH,2.8),sharey=True,gridspec_kw={"wspace":.15})
-    for ax,key,label,title in [(axs[0],"end_to_end_standard","(a)",r"standard $\delta$"),(axs[1],"end_to_end_large","(b)",r"large $\delta$")]:
-        d=data[key];cases=d["cases"];x=np.arange(len(cases));w=.23
-        stages=[("PETAL2D",[c["petal2d"]["relative_l2"] for c in cases]),("HarmonicTransform",[c["harmonic_transform"]["analytic_error"]["relative_l2"] for c in cases]),("Interaction",[c["interactions"][0]["relative_l2"] for c in cases])]
-        for i,(name,vals) in enumerate(stages): ax.bar(x+(i-1)*w,vals,width=w,label=name)
-        ax.axhline(1e-4,color="0.35",linestyle=":",linewidth=.8);ax.set_yscale("log");ax.set_xticks(x,[c["name"].replace("_"," ") for c in cases],rotation=28,ha="right");ax.set_title(title);finish_axis(ax,grid=True);panel_label(ax,label)
-    axs[0].set_ylabel("stage relative $L_2$ error");axs[0].legend(fontsize=6.8)
-    fig.subplots_adjust(bottom=.25)
-    save_figure(fig,outdir,"figureS05_end_to_end_stage_errors",manifest,["pipeline.json :: sections.end_to_end_standard_delta","pipeline.json :: sections.end_to_end_large_delta"],"Stage-resolved errors through PETAL2D -> HarmonicTransform -> Interaction.")
+    method_handles = [Line2D([0], [0], color=COLORS[m], linestyle=METHOD_LINESTYLE[m],
+                             marker=METHOD_MARKER[m], label=METHOD_LABEL[m])
+                      for m in ("simpson", "gl4", "fftlog", "ogata")]
+    fig.legend(method_handles, [h.get_label() for h in method_handles],
+               loc="upper center", bbox_to_anchor=(0.5, 0.995), ncol=4,
+               frameon=False, fontsize=5.9, columnspacing=0.9)
+    fig.subplots_adjust(top=0.80, bottom=.28)
+    save_figure(
+        fig, outdir, "figureS04_cross_stage_and_safe_refusal", manifest,
+        ["pipeline.json :: sections.cross_stage_standard_delta",
+         "pipeline.json :: sections.cross_stage_large_delta"],
+        "Cross-stage independent-reference accuracy and the explicit large-displacement upstream q-boundary safeguard.",
+    )
 
+def figS5_end_to_end(data, outdir, manifest):
+    fig, axs = plt.subplots(1, 2, figsize=(MAIN_WIDTH, 2.85), sharey=True,
+                            gridspec_kw={"wspace": .15})
+    stage_styles = {
+        "PETAL2D": {"color": "#0072B2", "hatch": ""},
+        "HarmonicTransform": {"color": "#E69F00", "hatch": "//"},
+        "Interaction": {"color": "#009E73", "hatch": ".."},
+    }
+    for ax, key, label, title in [
+        (axs[0], "end_to_end_standard", "(a)", r"standard $\delta$"),
+        (axs[1], "end_to_end_large", "(b)", r"large $\delta$"),
+    ]:
+        d = data[key]
+        cases = d["cases"]
+        x = np.arange(len(cases))
+        width = .23
+        stages = [
+            ("PETAL2D", [c["petal2d"]["relative_l2"] for c in cases]),
+            ("HarmonicTransform", [c["harmonic_transform"]["analytic_error"]["relative_l2"] for c in cases]),
+            ("Interaction", [c["interactions"][0]["relative_l2"] for c in cases]),
+        ]
+        for i, (name, vals) in enumerate(stages):
+            style = stage_styles[name]
+            ax.bar(x + (i - 1) * width, vals, width=width, color=style["color"],
+                   hatch=style["hatch"], label=name)
+        ax.axhline(1e-4, color="0.35", linestyle=":", linewidth=.8)
+        ax.set_yscale("log")
+        ax.set_xticks(x, [c["name"].replace("_", " ") for c in cases],
+                      rotation=28, ha="right")
+        ax.set_title(title)
+        finish_axis(ax, grid=True)
+        panel_label(ax, label)
+    axs[0].set_ylabel(r"stage relative $L^2$ error")
+    handles = [mpl.patches.Patch(facecolor=stage_styles[name]["color"],
+                                 hatch=stage_styles[name]["hatch"], label=name)
+               for name in stage_styles]
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.995),
+               ncol=3, frameon=False, fontsize=6.4)
+    fig.subplots_adjust(top=0.78, bottom=.25)
+    save_figure(
+        fig, outdir, "figureS05_end_to_end_stage_errors", manifest,
+        ["pipeline.json :: sections.end_to_end_standard_delta",
+         "pipeline.json :: sections.end_to_end_large_delta"],
+        "Stage-resolved errors through PETAL2D, HarmonicTransform, and Interaction.",
+    )
 
 def figS6_detailed_scaling(data,outdir,manifest):
     hs=data["harmonic_scaling"];ins=data["interaction_scaling"]
@@ -1105,17 +1215,17 @@ def generate_tables(data,outdir:Path,manifest:dict):
     write_tex_table(outdir/"table01_end_to_end_accuracy.tex",headers,[[tex_escape(x) for x in r] for r in rows],"True end-to-end validation through PETAL2D, HarmonicTransform, and Interaction.","tab:end_to_end")
     manifest["table01_end_to_end_accuracy"]={"sources":["pipeline.json :: sections.end_to_end_standard_delta","pipeline.json :: sections.end_to_end_large_delta"]}
 
-    # Main Table 2: automatic certification at primary tolerance.
-    d=data["interaction_convergence"];headers=["domain","method","certified / cases","false positives","capable selector misses"]
+    # Main Table 2: automatic convergence at the primary target.
+    d=data["interaction_convergence"];headers=["domain","method","accepted + ref pass / cases","accepted + ref fail","capable selector misses"]
     rows=[]
     for s in d["summary"]["by_method_and_domain"]:
         rows.append([s["delta_domain"],METHOD_LABEL.get(s["method"],s["method"]),f"{s['n_certified_reference_pass']}/{s['n_rows']}",s["n_false_positive"],s["n_selector_miss_backend_capable"]])
-    write_csv(outdir/"table02_automatic_certification.csv",headers,rows)
-    write_tex_table(outdir/"table02_automatic_certification.tex",headers,[[tex_escape(x) for x in r] for r in rows],"Automatic Interaction certification against independent references at the primary $10^{-4}$ target.","tab:auto_cert")
-    manifest["table02_automatic_certification"]={"sources":["interaction_convergence.json :: sections.primary_tolerance"]}
+    write_csv(outdir/"table02_automatic_convergence_outcomes.csv",headers,rows)
+    write_tex_table(outdir/"table02_automatic_convergence_outcomes.tex",headers,[[tex_escape(x) for x in r] for r in rows],"Automatic Interaction convergence evaluated against independent references at the primary $10^{-4}$ target.","tab:auto_convergence")
+    manifest["table02_automatic_convergence_outcomes"]={"sources":["interaction_convergence.json :: sections.primary_tolerance"]}
 
     # Supplement Table S1: broad Interaction accuracy/timing summary.
-    d=data["interaction_accuracy"];headers=["method","target","certified","capable","worst L2","worst peak","median prod (ms)","median cal (ms)"]
+    d=data["interaction_accuracy"];headers=["method","target","reference pass","capability fraction","worst L2","worst peak","median prod (ms)","median cal (ms)"]
     rows=[]
     for s in d["summary"]:
         rows.append([METHOD_LABEL.get(s["method"],s["method"]),f"{s['requested_tolerance']:.0e}",f"{s['n_reference_pass']}/{s['n_cases']}",f"{s['tested_capability_fraction']:.3f}",fmt_e(s.get("worst_relative_l2")),fmt_e(s.get("worst_relative_peak")),fmt_ms(s.get("median_production_seconds")),fmt_ms(s.get("median_calibration_seconds"))])
@@ -1124,26 +1234,26 @@ def generate_tables(data,outdir:Path,manifest:dict):
     manifest["tableS01_interaction_accuracy_summary"]={"sources":["interaction_accuracy.json :: sections.broad_accuracy_and_timing"]}
 
     # Supplement Table S2: primary method matrix including finite alternatives.
-    d=data["interaction_method_matrix_1e-4"];headers=["method","certified","capability fraction","worst L2","worst peak","median prod (ms)","median cal (ms)"]
+    d=data["interaction_method_matrix_1e-4"];headers=["method","reference pass","capability fraction","worst L2","worst peak","median prod (ms)","median cal (ms)"]
     rows=[]
     for s in d["summary"]:
         rows.append([METHOD_LABEL.get(s["method"],s["method"]),f"{s['n_reference_pass']}/{s['n_cases']}",f"{s['tested_capability_fraction']:.3f}",fmt_e(s.get("worst_relative_l2")),fmt_e(s.get("worst_relative_peak")),fmt_ms(s.get("median_production_seconds")),fmt_ms(s.get("median_calibration_seconds"))])
     write_csv(outdir/"tableS02_interaction_method_matrix.csv",headers,rows)
-    write_tex_table(outdir/"tableS02_interaction_method_matrix.tex",headers,[[tex_escape(x) for x in r] for r in rows],"Public Interaction backend matrix at $10^{-4}$ for the canonical 74-case standard-domain suite.","tab:s_method_matrix")
+    write_tex_table(outdir/"tableS02_interaction_method_matrix.tex",headers,[[tex_escape(x) for x in r] for r in rows],"Public Interaction method matrix at $10^{-4}$ for the canonical 74-case standard-domain suite.","tab:s_method_matrix")
     manifest["tableS02_interaction_method_matrix"]={"sources":["interaction_accuracy.json :: sections.primary_tolerance_method_matrix"]}
 
     # Supplement Table S3: large-delta practical fixed production, case-resolved.
     d=data["fixed_performance_large_1e-3"];headers=["case","method","qualification","error","prod (ms)"]
     rows=[]
     for r in d["rows"]:
-        qual_label={"automatic_certificate":"automatic","independent_oracle_qualification":"independent oracle","independent_terminal_qualification":"terminal reference"}.get(r["qualification_kind"],r["qualification_kind"].replace("_"," "))
+        qual_label={"automatic_certificate":"automatic selection","independent_oracle_qualification":"independent reference","independent_terminal_qualification":"terminal reference"}.get(r["qualification_kind"],r["qualification_kind"].replace("_"," "))
         rows.append([CASE_LABEL.get(r["case"],r["case"].replace("_"," ")),METHOD_LABEL.get(r["method"],r["method"]),qual_label,f"{eps_ref(r['qualification_reference_error']):.3e}",f"{1e3*r['production_timing']['median_seconds']:.3f}"])
     write_csv(outdir/"tableS03_large_delta_fixed_performance.csv",headers,rows)
     write_tex_table(outdir/"tableS03_large_delta_fixed_performance.tex",headers,[[tex_escape(x) for x in r] for r in rows],r"Reference-qualified fixed-parameter production timing for $10^{-3}$ and $10^2\leq\delta\leq10^4$.","tab:s_large_fixed")
     manifest["tableS03_large_delta_fixed_performance"]={"sources":["performance.json :: sections.qualified_fixed_configuration_large_delta_practical_tolerance"]}
 
     # Supplement Table S4: cross-stage summary.
-    headers=["domain","method","converged","reference pass","q-boundary refusals","backend refusals","worst L2","worst peak"]
+    headers=["domain","method","converged","reference pass","q-boundary refusals","numerical-method refusals","worst L2","worst peak"]
     rows=[]
     for key,dom in [("cross_stage_standard","standard"),("cross_stage_large","large")]:
         for s in data[key]["summary"]:
@@ -1193,24 +1303,24 @@ def write_caption_file(path:Path):
     text=r"""# QUARTIC2D manuscript figure captions
 
 ## Figure 1 - Method and representative calculation
-(a) Representative anisotropic input density. (b) Retained radial angular harmonics. (c) Corresponding Fourier-Bessel form factors, comparing the benchmark-selected numerical transform with the analytic form factors. (d) Screened interaction along the x direction, comparing the selected QUARTIC2D calculation with an independently integrated direct-q reference. The calculation illustrates the sequence rho(x,y) -> rho_m(r) -> F_m(q) -> V(delta); quantitative validation is reported in Figs. 2-5.
+(a) Representative anisotropic transition field. (b) Retained radial angular harmonics. (c) Corresponding Fourier-Bessel form factors, comparing the benchmark-selected numerical transform with the analytic form factors. (d) Screened interaction along the x direction, comparing the selected QUARTIC2D calculation with an independently integrated direct-q reference. The calculation illustrates the sequence rho(x,y) -> rho_m(r) -> F_m(q) -> V(delta); quantitative validation is reported in Figs. 2-5.
 
 ## Figure 2 - Direct numerical accuracy
-Numerical/reference comparisons for (a) an isotropic Gaussian Hankel transform, (b) the m=2 component of an anisotropic Gaussian, (c) an anisotropic strongly screened Rytova-Keldysh interaction, and (d) the nodal 2DEG-RPA benchmark. Lower panels show absolute numerical-reference differences normalized by the peak reference magnitude, avoiding ill-conditioned pointwise relative errors near zeros.
+Numerical/reference comparisons for (a) an isotropic Gaussian Hankel transform, (b) the m=2 component of an anisotropic Gaussian, (c) an anisotropic strongly screened Rytova-Keldysh interaction, and (d) the nodal 2DEG-RPA benchmark. Lower panels show pointwise absolute numerical-reference differences normalized by the peak reference magnitude. Their maxima give the peak-normalized error; they are not pointwise relative-error or `rtol` bounds.
 
 ## Figure 3 - Automatic error control
-(a) Achieved independent-reference error versus requested Interaction tolerance over the broad fixed-field benchmark. Large symbols denote per-method medians and the diagonal denotes achieved=requested. (b) Finite-rule Richardson error estimate versus actual independent relative L2 error for automatically certified Simpson and GL4 calculations; the diagonal denotes equality. (c) Outcomes of the primary 10^-4 automatic-convergence validation, separating correct certificates, conservative refusals/misses, demonstrated selector misses, tested-box incapability, and false positives.
+(a) Independent aggregate reference error versus requested Interaction `rtol` over the broad fixed-field benchmark. Large symbols denote per-method medians. The diagonal compares two distinct global quantities and is not a pointwise-error guarantee. (b) Finite-rule Richardson estimate versus independent relative L2 error for automatically accepted Simpson and GL4 calculations. (c,d) Case-level automatic-convergence outcomes for the canonical standard- and large-displacement matrices. Symbols distinguish automatic acceptance followed by independent-reference passing, reference-qualified points found after automatic refusal, unresolved automatic refusals, and cases for which no capable point was demonstrated in the declared tested box.
 
 ## Figure 4 - Accuracy versus computational cost
-Production execution time versus achieved independent-reference error for representative standard- and large-separation workloads. The standard-domain panels include the three requested-accuracy levels where available; the large-separation panels use independently qualified fixed configurations at the practical 10^-3 target. A method is shown only when an independently reference-qualified production timing exists in the relevant benchmark. Public Ogata was not part of the older canonical standard-domain timing sweep. Trapezoid and GL8 were not part of the practical large-separation fixed-configuration timing run. FFTLog is additionally absent from the large-separation complex dual-gate panel because no tested configuration met the target. Comparisons are workload-specific and do not define a universal backend ranking.
+Production execution time versus achieved independent-reference error for representative standard- and large-separation workloads. The standard-domain panels include the three requested-accuracy levels where available; the large-separation panels use independently qualified fixed configurations at the practical 10^-3 target. A method is shown only when an independently reference-qualified production timing exists in the relevant benchmark. Public Ogata was not part of the older canonical standard-domain timing sweep. Trapezoid and GL8 were not part of the practical large-separation fixed-configuration timing run. FFTLog is additionally absent from the large-separation complex dual-gate panel because no tested configuration met the target. Comparisons are workload-specific and do not define a universal method ranking.
 
 ## Figure 5 - Scaling and reusable calibration
 (a) HarmonicTransform runtime versus the dominant work measure N_m N_q N_s. (b) Finite-grid Interaction runtime versus N_p N_D N_q,s. (c) FFTLog Interaction runtime versus N_p[N_F log2 N_F + N_D]; the dashed proportional line is a source-derived work guide, not a fitted asymptotic law. (d) Effective per-evaluation time t_eff=t_prod+t_cal/M for two prequalified repeated-use workloads, separating one-time calibration from fixed-parameter production.
 
 ## Supplementary figures
-S1: Per-workload HarmonicTransform validation at 10^-3, 10^-4, and 10^-5, shown as independent categorical points rather than connected progressions.
-S2: Per-case achieved Interaction error over the 74-case broad validation suite, shown as unconnected categorical scatter points against the requested-tolerance line.
-S3: FFTLog bounded (N,q_bias) capability maps and Ogata coupled h-N refinement paths.
+S1: Per-workload HarmonicTransform independent-reference validation at requested `rtol` values 10^-3, 10^-4, and 10^-5, shown as independent categorical points rather than connected progressions.
+S2: Cumulative independent-reference error and coverage over the 74-case broad validation suite. The vertical requested-level guide is compared with the global reference-error scalar; plateaus below one expose incomplete qualification in the declared search.
+S3: FFTLog bounded (N,q_bias) capability maps and Ogata coupled h-N refinement paths for specialist numerical methods.
 S4: Standard and large-delta cross-stage accuracy together with the q-boundary safety test.
 S5: Stage-resolved true end-to-end errors through PETAL2D, HarmonicTransform, and Interaction.
 S6: Individual runtime scaling sweeps underlying the work-collapse main figure.
@@ -1230,7 +1340,7 @@ def main():
     parser.add_argument("--results",type=Path,default=Path("benchmarks/results"))
     parser.add_argument("--output",type=Path,default=Path("benchmarks/results/manuscript_artifacts"))
     args=parser.parse_args()
-    apply_style();global COLORS;COLORS=method_colors()
+    apply_style()
     r=args.results
     data, provenance = load_publication_results(r)
     out=args.output;mainout=out/"main";supp=out/"supplement";tables=out/"tables"
@@ -1242,7 +1352,7 @@ def main():
     fig5_scaling_reuse(data,mainout,manifest)
     figS1_harmonic_validation(data,supp,manifest)
     figS2_interaction_distributions(data,supp,manifest)
-    figS3_backend_parameters(data,supp,manifest)
+    figS3_numerical_method_parameters(data,supp,manifest)
     figS4_cross_stage_and_refusal(data,supp,manifest)
     figS5_end_to_end(data,supp,manifest)
     figS6_detailed_scaling(data,supp,manifest)

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "managed_directories": [
+    "docs/source/_static/examples",
+    "docs/source/_static/validation",
+    "docs/source/_generated/validation",
+    "docs/source/_generated/examples"
+  ],
+  "groups": {
+    "example_figures": {
+      "producer": "python docs/scripts/generate_figures.py examples",
+      "requires_publication_results": false,
+      "paths": [
+        "docs/source/_static/examples/anisotropic_hankel.svg",
+        "docs/source/_static/examples/anisotropic_orientation.svg",
+        "docs/source/_static/examples/anisotropic_pair_contributions.svg",
+        "docs/source/_static/examples/complex_orbital_channels.svg",
+        "docs/source/_static/examples/complex_orbital_hankel.svg",
+        "docs/source/_static/examples/direct_exchange.svg",
+        "docs/source/_static/examples/gaussian_hankel_end_to_end.svg",
+        "docs/source/_static/examples/gaussian_interaction_end_to_end.svg",
+        "docs/source/_static/examples/gaussian_petal2d.svg",
+        "docs/source/_static/examples/large_delta_methods.svg",
+        "docs/source/_static/examples/rk_multichannel_cuts.svg",
+        "docs/source/_static/examples/rk_multichannel_map.svg",
+        "docs/source/_static/examples/sampled_data_field.svg",
+        "docs/source/_static/examples/sampled_data_transform.svg"
+      ]
+    },
+    "validation_figures": {
+      "producer": "python docs/scripts/generate_figures.py validation --results-dir <publication-results>",
+      "requires_publication_results": true,
+      "paths": [
+        "docs/source/_static/validation/autoconvergence_domain_cost.svg",
+        "docs/source/_static/validation/autoconvergence_standard_cost.svg",
+        "docs/source/_static/validation/benchmark_kernels.svg",
+        "docs/source/_static/validation/benchmark_workloads.svg",
+        "docs/source/_static/validation/canonical_method_status.svg",
+        "docs/source/_static/validation/end_to_end_accuracy.svg",
+        "docs/source/_static/validation/fftlog_kernel_coverage.svg",
+        "docs/source/_static/validation/fftlog_workload_coverage.svg",
+        "docs/source/_static/validation/harmonic_method_accuracy_cost.svg",
+        "docs/source/_static/validation/interaction_memory_scaling.svg",
+        "docs/source/_static/validation/interaction_method_accuracy_cost.svg",
+        "docs/source/_static/validation/interaction_scaling.svg",
+        "docs/source/_static/validation/large_delta_timing.svg"
+      ]
+    },
+    "validation_text": {
+      "producer": "python docs/scripts/generate_evidence.py --results-dir <publication-results>",
+      "requires_publication_results": true,
+      "paths": [
+        "docs/source/_generated/validation/canonical_outcomes.md",
+        "docs/source/_generated/validation/cross_stage.md",
+        "docs/source/_generated/validation/end_to_end.md",
+        "docs/source/_generated/validation/fftlog_coverage.md",
+        "docs/source/_generated/validation/harmonic_primary.md",
+        "docs/source/_generated/validation/interaction_primary.md",
+        "docs/source/_generated/validation/interaction_tolerance_response.md",
+        "docs/source/_generated/validation/large_delta_timing.md",
+        "docs/source/_generated/validation/reference_stability.md",
+        "docs/source/_generated/validation/snapshot.json",
+        "docs/source/_generated/validation/standard_calibration_cost.md"
+      ]
+    },
+    "example_run_artifacts": {
+      "producer": "python docs/scripts/generate_example_artifacts.py",
+      "requires_publication_results": false,
+      "paths": [
+        "docs/source/_generated/examples/isotropic_interaction.txt",
+        "docs/source/_generated/examples/direct_exchange.txt",
+        "docs/source/_generated/examples/anisotropic_interaction.txt",
+        "docs/source/_generated/examples/sampled_data.txt",
+        "docs/source/_generated/examples/complex_transition_field.txt",
+        "docs/source/_generated/examples/screening_family_sweep.txt",
+        "docs/source/_generated/examples/large_separation.txt",
+        "docs/source/_static/examples/isotropic_harmonic_convergence.svg",
+        "docs/source/_static/examples/isotropic_interaction_convergence.svg",
+        "docs/source/_static/examples/direct_exchange_harmonic_convergence.svg",
+        "docs/source/_static/examples/direct_exchange_interaction_convergence.svg",
+        "docs/source/_static/examples/anisotropic_harmonic_convergence.svg",
+        "docs/source/_static/examples/anisotropic_interaction_convergence.svg",
+        "docs/source/_static/examples/sampled_harmonic_convergence.svg",
+        "docs/source/_static/examples/sampled_interaction_convergence.svg",
+        "docs/source/_static/examples/complex_harmonic_convergence.svg",
+        "docs/source/_static/examples/complex_interaction_convergence.svg",
+        "docs/source/_static/examples/screening_interaction_convergence.svg",
+        "docs/source/_static/examples/large_harmonic_convergence.svg",
+        "docs/source/_static/examples/large_interaction_convergence.svg"
+      ]
+    }
+  }
+}

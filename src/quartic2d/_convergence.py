@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from itertools import pairwise
 from time import perf_counter
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any
 
 import numpy as np
-
 
 ArrayEvaluator = Callable[[Mapping[str, Any]], np.ndarray]
 
@@ -262,8 +263,8 @@ def converge_ogata(
             rtol=rtol,
             maxiter=maxiter,
         )
-    except Exception as exc:
-        # hankel.get_h raises a generic Exception when its bounded search does
+    except RuntimeError as exc:
+        # hankel.get_h raises RuntimeError when its bounded search does
         # not satisfy the requested tolerance. Treat that documented
         # non-convergence as a convergence result, not as a package crash.
         if "Maxiter reached while checking convergence" not in str(exc):
@@ -328,79 +329,6 @@ def converge_ogata(
     )
 
 
-@dataclass
-class InteractionConvergenceResult:
-    """Verified numerical parameters for an :class:`Interaction` calculation.
-
-    The expensive convergence study is kept separate from production use.  The
-    selected backend parameters can be reused with :meth:`interaction` without
-    repeating the search.  Backend convergence is defined on the represented
-    momentum-space inputs.  When those inputs carry automatic HarmonicTransform
-    q-sampling certificates, the Interaction calibration additionally records a
-    downstream q-boundary robustness probe and refuses certification if the
-    requested observable remains sensitive to the finite upstream support.
-    """
-
-    search: ConvergenceResult
-    method: str
-    interpolator: str
-    rtol: float
-    atol: float
-    _interaction_class: type | None = field(default=None, repr=False, compare=False)
-
-    @property
-    def converged(self) -> bool:
-        return bool(self.search.converged)
-
-    @property
-    def parameters(self) -> dict[str, Any]:
-        params = {
-            "method": str(self.method),
-            "interpolator": str(self.interpolator),
-        }
-        params.update(self.search.selected_parameters)
-        return params
-
-    def interaction(self, deltas, field1, field2, U_q):
-        """Build a production interaction from the verified parameters only."""
-        if not self.converged:
-            raise RuntimeError("Cannot build an interaction from unconverged parameters.")
-        if self._interaction_class is None:
-            from .interaction import Interaction
-            interaction_class = Interaction
-        else:
-            interaction_class = self._interaction_class
-
-        interaction = interaction_class(deltas, field1, field2, U_q, **self.parameters)
-        interaction._convergence_result = self
-        return interaction
-
-    def to_dict(self, *, include_values: bool = False) -> dict[str, Any]:
-        return {
-            "converged": self.converged,
-            "rtol": float(self.rtol),
-            "atol": float(self.atol),
-            "parameters": self.parameters,
-            "search": self.search.to_dict(include_values=include_values),
-        }
-
-    def __str__(self) -> str:
-        lines = [
-            "Interaction convergence",
-            "-----------------------",
-            f"numerical target (rtol) : {self.rtol:.1e}",
-            f"absolute target (atol)  : {self.atol:.1e}",
-            f"method                  : {self.method}",
-            f"status                  : {'PASS' if self.converged else 'FAIL'}",
-        ]
-        for key, value in self.search.selected_parameters.items():
-            if isinstance(value, float):
-                lines.append(f"{key:24s}: {value:.6g}")
-            else:
-                lines.append(f"{key:24s}: {value}")
-        return "\n".join(lines)
-
-
 def _criterion_from_estimate(
     relative_l2: float,
     absolute_linf: float,
@@ -439,8 +367,8 @@ def converge_fixed_order_sequence(
 
     Three successive resolutions are used to verify that refinement is in the
     expected asymptotic regime.  Richardson estimates then decide whether the
-    coarsest or middle member of the verified triplet already meets the target.
-    This allows an expensive calibration run to select the cheapest verified
+    coarsest or middle member of the accepted triplet already meets the target.
+    This allows an expensive calibration run to select the cheapest converged
     production resolution rather than automatically returning the finer check.
     """
     rtol, atol = _validate_tolerances(rtol, atol)
@@ -460,7 +388,7 @@ def converge_fixed_order_sequence(
     raw_values = [int(v) for v in parameter_values]
     if len(raw_values) < 3 or any(v < 1 for v in raw_values):
         raise ValueError("parameter_values must contain at least three positive levels.")
-    for left, right in zip(raw_values[:-1], raw_values[1:]):
+    for left, right in pairwise(raw_values):
         ratio = right / left
         if not np.isclose(ratio, refinement_factor, rtol=1.0e-12, atol=1.0e-12):
             raise ValueError(
@@ -551,7 +479,7 @@ def converge_fixed_order_sequence(
                 break
 
         verification = {
-            "triplet": [parameter_sets[i - 2], parameter_sets[i - 1], parameter_sets[i]],
+            "triplet": [parameter_sets[i - 2], parameter_sets[i - 1], parameters],
             "expected_order": expected_order,
             "observed_order_l2": p_l2,
             "observed_order_linf": p_abs,
@@ -562,16 +490,16 @@ def converge_fixed_order_sequence(
         steps[i].metadata.update(verification)
         if selected_index is not None:
             steps[selected_index].converged = True
-            steps[selected_index].metadata["verified_by_triplet_ending_at"] = parameter_sets[i]
+            steps[selected_index].metadata["verified_by_triplet_ending_at"] = parameters
             break
 
     fallback_verification: dict[str, Any] = {}
     if selected_index is None:
-        # Known-order Richardson verification can become unreliable on strongly
+        # Known-order Richardson extrapolation can become unreliable on strongly
         # oscillatory or nodal integrals even when the refinement sequence is
         # numerically stable.  Do not weaken the tolerance in that regime: fall
-        # back to the generic one-level look-ahead certificate and require two
-        # consecutive refinement changes to satisfy the same rtol/atol budget.
+        # back to the generic one-level look-ahead acceptance check and require
+        # two consecutive refinement changes to satisfy the same rtol/atol budget.
         stable_flags = [False] * len(values)
         for j in range(1, len(values)):
             stable, rel, rel_inf, abs_inf = _meets_tolerance(
@@ -635,7 +563,7 @@ def converge_verified_sequence(
 
     Two consecutive refinement changes must satisfy the tolerance.  The middle
     member of the stable triplet is selected, so the final member acts only as
-    an independent verification level.
+    an independent look-ahead level.
     """
     rtol, atol = _validate_tolerances(rtol, atol)
     parameter_sets = [dict(p) for p in parameter_sets]
@@ -668,7 +596,7 @@ def converge_verified_sequence(
         if i >= 2 and stable_flags[i - 1] and stable_flags[i]:
             selected_index = i - 1
             steps[selected_index].converged = True
-            steps[selected_index].metadata["verified_by"] = parameter_sets[i]
+            steps[selected_index].metadata["verified_by"] = parameters
             break
 
     if selected_index is None:
@@ -714,7 +642,7 @@ def converge_ogata_coupled(
     self-converged in ``N``.  Two consecutive changes between independently
     ``N``-converged ``h`` levels must then satisfy the requested tolerance.
     The middle member of this stable three-``h`` sequence is selected, with
-    the finest member serving only as look-ahead verification.
+    the finest member serving only as a look-ahead check.
 
     This strategy is intended for the workflow-level Interaction object, for
     which convergence of the final assembled interaction is the relevant
@@ -731,7 +659,7 @@ def converge_ogata_coupled(
     if not np.isfinite(hdecrement) or hdecrement <= 1.0:
         raise ValueError("hdecrement must be finite and greater than 1.")
     if maxiter < 3:
-        raise ValueError("maxiter must be at least 3 for Ogata look-ahead verification.")
+        raise ValueError("maxiter must be at least 3 for the Ogata look-ahead check.")
 
     ns = tuple(sorted({int(n) for n in n_values}))
     if len(ns) < 3 or any(n < 8 for n in ns):
@@ -850,7 +778,7 @@ def converge_ogata_coupled(
         resolution_converged = False
 
     # Describe the terminal h behavior without changing the convergence
-    # certificate.  This distinguishes a bounded search that was still
+    # acceptance check.  This distinguishes a bounded search that was still
     # improving when it stopped from one that had visibly stalled or become
     # non-monotonic.  It is a diagnostic, not an extrapolated error estimate.
     h_change_metrics: list[float] = []
@@ -929,13 +857,13 @@ def converge_fftlog_bias_resolution(
     The preferred bias is converged first with the complete ``n`` ladder.  Its
     selected resolution then provides a warm start for neighboring biases: a
     centered three-level ``(n/2, n, 2n)`` sequence is sufficient to apply the
-    same two-consecutive-change/look-ahead certificate used by
+    same two-consecutive-change/look-ahead acceptance rule used by
     :func:`converge_verified_sequence`.  Consecutive bias windows containing
     the preferred bias are tested from the center outward.  If no window can be
-    certified by these exact warm-start triplets, only the unresolved biases
+    accepted by these exact warm-start triplets, only the unresolved biases
     fall back to the complete ``n`` ladder.
 
-    This changes search order and reuse only; the resolution certificate and
+    This changes search order and reuse only; the resolution acceptance rule and
     the final mutual bias-consistency test are unchanged.
     """
     rtol, atol = _validate_tolerances(rtol, atol)
@@ -958,12 +886,12 @@ def converge_fftlog_bias_resolution(
     preferred_bias = float(biases[preferred_index])
 
     candidate_windows: list[list[float]] = []
-    for start in range(0, len(biases) - minimum_bias_cluster + 1):
+    for start in range(len(biases) - minimum_bias_cluster + 1):
         stop = start + minimum_bias_cluster
         if start <= preferred_index < stop:
             candidate_windows.append(biases[start:stop])
 
-    # Biases outside these windows can never contribute to a valid certificate.
+    # Biases outside these windows can never contribute to an accepted result.
     admissible_biases = sorted({bias for window in candidate_windows for bias in window})
     evaluation_cache: dict[tuple[int, float], np.ndarray] = {}
 
@@ -1097,7 +1025,7 @@ def converge_fftlog_bias_resolution(
     if chosen is None:
         fallback_used = True
         # Complete only the unresolved/failed biases.  Warm-triplet successes
-        # already carry the exact same resolution certificate and need no redo.
+        # already carry the same accepted resolution result and need no redo.
         for bias in admissible_biases:
             item = per_bias.get(bias)
             if item is None or not item.resolution_converged:

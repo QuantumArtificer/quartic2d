@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Paper benchmark: peak-RSS scaling of HarmonicTransform."""
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 from scipy.integrate import simpson
 
-from quartic2d import HarmonicTransform
-
 from benchmarks._common import environment_metadata, write_json
+from quartic2d import HarmonicTransform
 
 BATCH_SIZE = 256
 MIB = 1024.0**2
@@ -177,7 +177,7 @@ def sample_one(*, n_r, n_q, n_m, subdivisions, r_max, q_max, poll_seconds):
         "baseline_rss_bytes": int(baseline),
         "peak_rss_bytes": int(peak),
         "incremental_peak_rss_bytes": int(max(0, peak - baseline)),
-        "rss_samples": int(len(samples)),
+        "rss_samples": len(samples),
     }
 
 

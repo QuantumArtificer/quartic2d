@@ -1,25 +1,26 @@
 cff-version: 1.2.0
-message: "If you use QUARTIC2D in research, please cite the software release."
-title: "QUARTIC2D: Quadrature for Radial Tetra-center Interaction Coefficients in 2D"
+message: "If QUARTIC2D contributes to published research, cite the archived software release used in the calculation."
+title: "QUARTIC2D: Angular-Harmonic Evaluation of Four-Center Interactions in Two Dimensions"
 type: software
 version: 0.1.0
 abstract: >-
-  QUARTIC2D is a Python package for efficient evaluation of interaction matrix
-  elements between localized two-dimensional fields with radially symmetric
-  interaction kernels. It is built on top of PETAL2D and combines angular
-  harmonic decompositions with radial Hankel-transform and interaction
-  backends including Simpson and Gauss-Legendre quadrature, Ogata quadrature,
-  and FFTLog.
+  QUARTIC2D evaluates four-center interaction matrix elements for localized
+  two-dimensional states with translationally invariant radial kernels. The
+  method represents general real or complex transition fields in angular
+  harmonics and reduces the interaction to radial Hankel integrals. The same
+  formulation applies to direct, exchange, pair-hopping, correlated-hopping,
+  and other four-index orbital channels within the radial-kernel assumption.
 authors:
   - family-names: "Santacruz"
     given-names: "Alex"
 keywords:
-  - scientific computing
-  - Hankel transform
-  - numerical quadrature
-  - two-dimensional materials
+  - four-center interactions
   - interaction matrix elements
-  - condensed matter physics
+  - Hankel transform
+  - angular harmonics
+  - two-dimensional materials
+  - quantum materials
+  - Wannier functions
 repository-code: "https://github.com/QuantumArtificer/quartic2d"
-url: "https://github.com/QuantumArtificer/quartic2d"
+url: "https://quantumartificer.github.io/quartic2d/"
 license: MIT

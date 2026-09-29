@@ -1,11 +1,16 @@
-name: tests
+name: Tests
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   current-dependencies:
+    name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -24,7 +29,24 @@ jobs:
       - name: Run tests
         run: python -m pytest -v
 
+  quality:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install quality dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Check
+        run: python -m ruff check src tests examples benchmarks docs/scripts tools
+      - name: Check release metadata
+        run: python tools/check_release_metadata.py
+
   validation:
+    name: Analytic validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -40,6 +62,7 @@ jobs:
         run: python -m benchmarks.gaussian_validation --quick --output /tmp/quartic2d-gaussian.json
 
   oldest-supported-dependencies:
+    name: Oldest supported dependencies
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -64,6 +87,7 @@ jobs:
         run: python -m pytest -v
 
   distributions:
+    name: Build and smoke-test package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -74,8 +98,21 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
       - name: Install release dependencies
-        run: python -m pip install ".[release]"
+        run: python -m pip install ".[release,ogata]"
       - name: Build distributions
         run: python -m build
-      - name: Check distributions
+      - name: Check distribution metadata
         run: python -m twine check dist/*
+      - name: Install wheel
+        run: python -m pip install --force-reinstall dist/*.whl
+      - name: Import installed package outside the checkout
+        working-directory: /tmp
+        run: python -c "import quartic2d; print(quartic2d.__version__); print(quartic2d.__all__)"
+      - name: Run examples against installed package
+        env:
+          MPLBACKEND: Agg
+        run: |
+          for example in examples/*.py; do
+            echo "==> $example"
+            python "$example"
+          done

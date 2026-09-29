@@ -1,7 +1,11 @@
 # ---- test_helpers.py ----
+from typing import ClassVar
+
 import numpy as np
 import pytest
+from petal2d import PolarDecomposition
 
+from quartic2d import HankelTransform, HarmonicTransform
 from quartic2d._numerics import Interpolator1D, composite_gauss_nodes_weights
 
 
@@ -43,10 +47,6 @@ def test_not_a_knot_cubic_is_available_for_q_space_boundary_conditions():
     assert q_space_error < natural_error
 
 # ---- test_hankel.py ----
-import numpy as np
-import pytest
-
-from quartic2d import HankelTransform
 
 
 def gaussian_profile(r):
@@ -103,7 +103,9 @@ def test_ogata_backend_is_public():
 
 def test_legacy_experimental_ogata_import_remains_compatible():
     pytest.importorskip("hankel")
-    from quartic2d._experimental.ogata import HankelTransform as LegacyOgataHankelTransform
+    from quartic2d._experimental.ogata import (
+        HankelTransform as LegacyOgataHankelTransform,
+    )
 
     assert issubclass(LegacyOgataHankelTransform, HankelTransform)
 
@@ -299,11 +301,6 @@ def test_batched_fftlog_matches_individual_transforms():
     assert np.allclose(batched, individual, rtol=1.0e-13, atol=1.0e-13)
 
 # ---- test_harmonics.py ----
-import numpy as np
-import pytest
-from petal2d import PolarDecomposition
-
-from quartic2d import HarmonicTransform
 
 
 def gaussian(x, y):
@@ -393,9 +390,9 @@ def test_harmonics_reject_invalid_grid_parameters():
 def test_cutoff_radius_is_required():
     class IncompleteDecomposition:
         r = np.linspace(0.0, 1.0, 5)
-        rho = {0: np.ones(5)}
-        m_sorted = [0]
-        power_fracs = {0: 1.0}
+        rho: ClassVar[dict[int, np.ndarray]] = {0: np.ones(5)}
+        m_sorted: ClassVar[list[int]] = [0]
+        power_fracs: ClassVar[dict[int, float]] = {0: 1.0}
 
         def __getitem__(self, m):
             return self.rho[m]

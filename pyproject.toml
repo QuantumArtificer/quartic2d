@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quartic2d"
 dynamic = ["version"]
-description = "Quadrature for radial four-center interaction coefficients in two dimensions."
+description = "Four-center interaction integrals for localized two-dimensional states."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -16,13 +16,13 @@ authors = [
 ]
 keywords = [
   "four-center-integrals",
+  "interaction-matrix-elements",
   "hankel-transform",
   "angular-harmonics",
-  "two-dimensional",
-  "interactions",
-  "condensed-matter",
-  "materials-science",
-  "atomic-orbitals"
+  "two-dimensional-materials",
+  "quantum-materials",
+  "wannier-functions",
+  "condensed-matter-physics"
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -47,13 +47,15 @@ ogata = ["hankel>=1.2.2"]
 # Compatibility alias retained for users of the pre-public Ogata backend.
 experimental = ["hankel>=1.2.2"]
 test = ["pytest>=8"]
+dev = ["ruff>=0.15,<0.17"]
 release = ["build>=1.2", "twine>=5"]
 docs = [
-  "sphinx>=7",
+  "sphinx>=7.4",
   "pydata-sphinx-theme>=0.15",
   "myst-parser>=3",
   "sphinx-copybutton>=0.5",
-  "sphinx-design>=0.6"
+  "sphinx-design>=0.6",
+  "sphinxcontrib-bibtex>=2.6"
 ]
 
 [project.urls]
@@ -62,6 +64,7 @@ Documentation = "https://quantumartificer.github.io/quartic2d/"
 Repository = "https://github.com/QuantumArtificer/quartic2d"
 Issues = "https://github.com/QuantumArtificer/quartic2d/issues"
 Changelog = "https://github.com/QuantumArtificer/quartic2d/blob/main/CHANGELOG.md"
+Contributing = "https://github.com/QuantumArtificer/quartic2d/blob/main/CONTRIBUTING.md"
 
 [tool.setuptools.dynamic]
 version = { attr = "quartic2d._version.__version__" }
@@ -73,3 +76,22 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 addopts = "-ra"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["docs/_build"]
+
+[tool.ruff.lint]
+select = [
+  "E9", "F", "I",
+  "B023", "BLE001",
+  "UP033", "UP035", "UP037",
+  "C401", "C408",
+  "PIE808",
+  "RUF007", "RUF012", "RUF046", "RUF059",
+  "EXE001", "PLR1736",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["benchmarks", "generate_evidence", "quartic2d"]

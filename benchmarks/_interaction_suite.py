@@ -6,21 +6,22 @@ from a completed HarmonicTransform benchmark JSON so the two benchmark layers
 share the actual selected radial/q resolutions rather than merely similar test
 functions.
 """
+
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
-from typing import Callable, Iterable
 
 import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import jv
 
+from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
 from quartic2d import HarmonicTransform, Interaction
 from quartic2d._numerics import common_grid
-
-from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
 
 FINITE_METHODS = ("trapezoid", "simpson", "gl4", "gl8")
 ALL_METHODS = FINITE_METHODS + ("ogata", "fftlog")
@@ -566,7 +567,7 @@ def _phase_resolved_legendre(grid, magnitude, order, max_phase_step):
     x, w = leggauss(int(order))
     left_parts = []
     right_parts = []
-    for left, right in zip(grid[:-1], grid[1:]):
+    for left, right in pairwise(grid):
         count = max(1, int(np.ceil(magnitude * (right - left) / max_phase_step)))
         edges = np.linspace(left, right, count + 1)
         left_parts.append(edges[:-1])

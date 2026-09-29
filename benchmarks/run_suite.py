@@ -5,23 +5,26 @@ The launcher separates manuscript-grade evidence from the lightweight documentat
 validation. Publication commands use fixed arguments so the final dataset is
 reproducible and auditable.
 """
+
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-import json
 import os
 import shutil
 import subprocess
 import sys
 import textwrap
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable
 
 from benchmarks._common import git_metadata, write_json
-from benchmarks._results import consolidate_publication_results, remove_staging_directory
+from benchmarks._results import (
+    consolidate_publication_results,
+    remove_staging_directory,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "benchmarks" / "results"
@@ -703,7 +706,7 @@ def main() -> None:
     print("\n" + "=" * 100)
     print("BENCHMARK SUITE COMPLETE")
     print("=" * 100)
-    print(f"Status  : PASS")
+    print("Status  : PASS")
     print(f"Results : {final_dir}")
     if manifest["consolidated_outputs"]:
         print("Files   :")

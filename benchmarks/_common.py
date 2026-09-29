@@ -1,4 +1,5 @@
 """Shared helpers for publication benchmark scripts."""
+
 from __future__ import annotations
 
 import hashlib
@@ -11,7 +12,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -110,15 +110,15 @@ def git_metadata() -> dict:
 def environment_metadata() -> dict:
     try:
         import scipy
-    except Exception:  # pragma: no cover
+    except ImportError:  # pragma: no cover
         scipy = None
     try:
         import quartic2d
-    except Exception:  # pragma: no cover
+    except ImportError:  # pragma: no cover
         quartic2d = None
     try:
         import petal2d
-    except Exception:  # pragma: no cover
+    except ImportError:  # pragma: no cover
         petal2d = None
     return {
         "python": sys.version,

@@ -1,0 +1,25 @@
+PETAL2D
+rho_ss: modes=[0], reconstruction error=1.343e-14%
+rho_sh: modes=[0, 1, -2], reconstruction error=2.801e-14%
+rho_hs: modes=[0, -1, 2], reconstruction error=2.817e-14%
+
+HarmonicTransform
+all self-convergence criteria satisfied: True
+m=+0 analytic peak-normalized max error: 2.237e-03
+m=+1 analytic peak-normalized max error: 6.462e-04
+m=-2 analytic peak-normalized max error: 5.839e-04
+
+Interaction
+all self-convergence criteria satisfied: True
+delta=0.0
+  exchange           +0.20551-0.00000j
+  pair hopping       +0.11068-0.00000j
+  correlated hopping +0.18999-0.00000j
+delta=1.0
+  exchange           +0.08785-0.09124j
+  pair hopping       +0.07657+0.00000j
+  correlated hopping +0.10082+0.08932j
+delta=2.0
+  exchange           -0.00747-0.03511j
+  pair hopping       +0.03194+0.00000j
+  correlated hopping +0.00974+0.05535j

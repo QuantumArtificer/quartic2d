@@ -1,59 +1,49 @@
 API reference
 =============
 
-The public API is re-exported from :mod:`quartic2d`.
+The API reference is organized by public objects rather than as a single
+member dump.  Each class has an overview page, and callable methods have their
+own pages with the exact signature, parameter contract, and a short usage
+pattern.  Tutorial calculations remain in the :doc:`../getting_started` and
+:doc:`../examples/index` sections.  Physical and numerical boundaries are
+documented separately in :doc:`../limitations`.
 
-.. currentmodule:: quartic2d
+Core calculation
+----------------
 
-HankelTransform
----------------
+:doc:`harmonic_transform`
+    Transform the retained PETAL2D angular harmonics to momentum space and
+    inspect or calibrate the numerical representation.
 
-.. autoclass:: HankelTransform
-   :members:
-   :undoc-members:
-
-HankelofHarmonics
------------------
-
-.. autoclass:: HankelofHarmonics
-   :members:
-   :undoc-members:
-
-Interact
---------
-
-.. autoclass:: Interact
-   :members:
-   :undoc-members:
+:doc:`interaction`
+    Assemble four-center matrix elements from two transformed transition
+    fields, a radial kernel, and displacement vectors.
 
 Convergence results
 -------------------
 
-.. autoclass:: ConvergenceStep
-   :members:
+:doc:`harmonic_convergence_result`
+    Reusable result returned by
+    :meth:`quartic2d.HarmonicTransform.converge_parameters`.
 
-.. autoclass:: ConvergenceResult
-   :members:
+:doc:`interaction_convergence_result`
+    Reusable result returned by
+    :meth:`quartic2d.Interaction.converge_parameters`.
 
-Convergence utilities
----------------------
+Advanced numerical primitive
+----------------------------
 
-.. autofunction:: converge_sequence
+:doc:`hankel_transform`
+    One sampled radial Hankel transform.  Most users should work through
+    :class:`quartic2d.HarmonicTransform` instead.
 
 
-.. autofunction:: relative_l2_error
+.. toctree::
+   :maxdepth: 1
+   :hidden:
 
-.. autofunction:: relative_linf_error
-
-.. autofunction:: absolute_linf_error
-
-.. autofunction:: roundtrip_error
-
-Backend registries
-------------------
-
-.. autofunction:: available_quadratures
-
-.. autofunction:: available_transforms
-
-.. autofunction:: available_interpolators
+   harmonic_transform
+   interaction
+   harmonic_convergence_result
+   interaction_convergence_result
+   hankel_transform

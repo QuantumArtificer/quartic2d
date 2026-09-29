@@ -4,17 +4,16 @@ The checks in this module are deliberately cheap.  They inspect quantities that
 already exist after a transform has been computed and never launch a second
 Hankel transform.  They are fault detectors, not convergence proofs: a warning
 means that a numerical choice deserves attention, while the explicit
-convergence helpers perform the expensive verification when requested.
+convergence helpers perform the expensive refinement studies when requested.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
+from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.integrate import trapezoid
-
 
 # These defaults were calibrated against the analytic harmonic-transform benchmark suite.
 # They are intentionally conservative for smooth localized profiles.  The fast
@@ -54,9 +53,9 @@ class HarmonicTransformDiagnostics:
     -----
     These diagnostics are designed to answer a practical question: "does
     anything about this result look obviously under-resolved?"  They do not
-    certify a requested error tolerance.  Use
-    :meth:`quartic2d.HarmonicTransform.converge_parameters` when a quantitative
-    convergence certificate is needed.
+    establish a requested error tolerance.  Use
+    :meth:`quartic2d.HarmonicTransform.converge_parameters` when an explicit
+    convergence study is needed.
     """
 
     q_ceiling: float
@@ -103,7 +102,7 @@ class HarmonicTransformDiagnostics:
         lines.append(
             "The transform was returned, but these checks are indicators rather "
             "than error estimates. Run HarmonicTransform.converge_parameters(...) "
-            "to obtain parameters verified against a requested tolerance."
+            "to obtain parameters selected by an explicit convergence study."
         )
         return "\n".join(lines)
 
@@ -172,12 +171,12 @@ def default_q_grid(decomposition) -> tuple[float, int, dict[str, float]]:
 
     The number of q samples aims for five samples per Nyquist interval of the
     shortest oscillation implied by the retained radial support.  This density
-    keeps both relative L2 and relative maximum interpolation errors below
-    1e-4 on the non-discontinuous validation suite.  The grid is kept between
+    kept both relative L2 and peak-normalized maximum interpolation errors below
+    1e-4 on the tested non-discontinuous validation suite.  The grid is kept between
     32 and 512 points for predictable memory and runtime.  The subsequent fast
     fault detectors warn if these defaults look inadequate for a particular
-    profile.  Exact tolerance certification is intentionally left to the
-    explicit convergence helper.
+    profile.  Explicit tolerance-controlled convergence is intentionally left
+    to the convergence helper.
     """
     m_values = [int(m) for m in decomposition.m_sorted]
     if not m_values:
@@ -203,9 +202,7 @@ def default_q_grid(decomposition) -> tuple[float, int, dict[str, float]]:
     q_max_unclipped = _DEFAULT_Q_RMS_MULTIPLIER * q_rms
     q_max = min(q_max_unclipped, _DEFAULT_Q_CEILING_FRACTION * q_ceiling)
     support_radius = max(supports)
-    predicted = 1 + int(
-        math.ceil(_DEFAULT_Q_OVERSAMPLING * q_max * support_radius / np.pi)
-    )
+    predicted = 1 + math.ceil(_DEFAULT_Q_OVERSAMPLING * q_max * support_radius / np.pi)
     n_q = min(_DEFAULT_MAX_NQ, max(_DEFAULT_MIN_NQ, predicted))
     return float(q_max), int(n_q), {
         "q_ceiling": float(q_ceiling),
@@ -288,8 +285,8 @@ def inspect_transform(decomposition, q: np.ndarray, F_q: dict[int, np.ndarray]) 
         m = int(m_raw)
         values = np.asarray(F_q[m])
         peak = float(np.max(np.abs(values)))
-        amp_start = max(0, int(math.floor((1.0 - _BOUNDARY_AMPLITUDE_WINDOW) * q.size)))
-        power_start = max(0, int(math.floor((1.0 - _BOUNDARY_POWER_WINDOW) * q.size)))
+        amp_start = max(0, math.floor((1.0 - _BOUNDARY_AMPLITUDE_WINDOW) * q.size))
+        power_start = max(0, math.floor((1.0 - _BOUNDARY_POWER_WINDOW) * q.size))
         boundary_amplitude_ratio = (
             0.0 if peak == 0.0 else float(np.max(np.abs(values[amp_start:])) / peak)
         )

@@ -1,55 +1,28 @@
 # Releasing QUARTIC2D
 
-This checklist is for versioned GitHub, PyPI, and Zenodo releases.
+The complete maintainer procedure is documented in `docs/source/development/releasing.md`.
 
-## 1. Prepare the source tree
+A release is created from one annotated `vX.Y.Z` tag. The tag starts `.github/workflows/release.yml`, which validates the tagged source, builds and verifies the wheel and source distribution, publishes those exact distributions to PyPI through Trusted Publishing, and only then creates the GitHub Release. If the repository is enabled in Zenodo, that GitHub Release becomes the archived software record.
 
-Confirm that `src/quartic2d/_version.py`, `CITATION.cff`, and `CHANGELOG.md` agree on the release version. Replace `Unreleased` in the changelog with the release date before tagging.
-
-Clean generated artifacts and run the release checks:
+Before tagging, make the package version, `CITATION.cff`, and dated `CHANGELOG.md` heading agree. Run
 
 ```bash
-python tools/clean_generated.py
-python -m pytest -q
+python tools/check_release_metadata.py
+python -m pytest
+python -m ruff check src tests examples benchmarks docs/scripts tools
 python -m benchmarks.gaussian_validation --quick
+python docs/scripts/generate_figures.py examples
+python docs/scripts/generate_example_artifacts.py
+python docs/scripts/check_artifacts.py
 python -m sphinx -W --keep-going -b html docs/source docs/_build/html
+python docs/scripts/check_rendered_docs.py docs/_build/html
+python tools/clean_generated.py
+rm -rf build dist src/*.egg-info
 python -m build
 python -m twine check dist/*
+git status --short
 ```
 
-Inspect the contents of both the wheel and source distribution before publishing.
+Publication benchmark logs must be written outside the repository or to an ignored path. Generated benchmark results remain local or are archived with their manifest; they are not accumulated in the source tree. The tracked documentation evidence snapshot is regenerated from one archived canonical bundle and checked with `docs/scripts/check_artifacts.py`; it is not a substitute for archiving the JSON source bundle itself.
 
-## 2. Configure PyPI Trusted Publishing
-
-The release workflow is `.github/workflows/release.yml` and uses the GitHub environment `pypi`.
-
-For the first PyPI release, configure a pending Trusted Publisher for:
-
-- PyPI project: `quartic2d`
-- GitHub owner: `QuantumArtificer`
-- repository: `quartic2d`
-- workflow: `release.yml`
-- environment: `pypi`
-
-For an existing PyPI project, configure the same values under the project's Publishing settings. No long-lived PyPI token is required by the workflow.
-
-## 3. Enable Zenodo archiving
-
-Connect the GitHub account to Zenodo, synchronize the repository list, and enable `QuantumArtificer/quartic2d` before publishing the GitHub release. Zenodo will ingest enabled GitHub releases automatically.
-
-QUARTIC2D uses `CITATION.cff` as the software metadata source. Do not add `.zenodo.json` unless Zenodo-specific metadata becomes necessary, because Zenodo gives `.zenodo.json` precedence over `CITATION.cff` when both exist.
-
-## 4. Tag and publish
-
-After all checks pass:
-
-```bash
-git status
-git tag -a v0.1.0 -m "QUARTIC2D v0.1.0"
-git push origin main
-git push origin v0.1.0
-```
-
-Create the corresponding GitHub release from tag `v0.1.0`. Publishing the release triggers the PyPI workflow; the enabled Zenodo integration archives the GitHub release.
-
-After Zenodo creates the DOI, add the DOI badge/link to the repository for the next commit or release as appropriate.
+The release lint gate uses the repository-local Ruff policy in `pyproject.toml` through the `dev` extra; do not substitute a user-level Ruff configuration.

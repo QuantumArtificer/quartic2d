@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
+from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.integrate import cumulative_simpson, simpson
@@ -34,7 +34,7 @@ class QTailModeResult:
 
 @dataclass
 class QInterpolationStep:
-    """One q-grid interpolation verification level."""
+    """One q-grid interpolation refinement level."""
 
     oversampling: float
     n_q: int
@@ -103,101 +103,6 @@ class QSamplingResult:
             "grid_kind": str(self.grid_kind),
             "q_grid": None if self.q_grid is None else [float(x) for x in np.asarray(self.q_grid)],
             "interpolation_steps": [step.to_dict() for step in self.interpolation_steps],
-        }
-
-
-@dataclass
-class HarmonicConvergenceResult:
-    """Verified numerical parameters for a PETAL2D harmonic transform.
-
-    This object is produced by :meth:`HarmonicTransform.converge_parameters`.
-    It separates the expensive calibration run from later production
-    transforms: the selected parameters can be reused without repeating the
-    convergence study.
-
-    ``rtol`` controls numerical discretization error on the represented q
-    interval (q-grid interpolation and radial quadrature). ``q_tail_rtol`` is
-    separate: it limits the relative L2 norm allowed outside the selected
-    ``q_max``.  The latter is a support/truncation criterion rather than a
-    quadrature tolerance.
-    """
-
-    sampling: QSamplingResult
-    quadrature: object
-    method: str
-    interpolator: str
-    rtol: float
-    atol: float
-    q_tail_rtol: float
-
-    @property
-    def converged(self) -> bool:
-        return bool(self.sampling.converged and self.quadrature.converged)
-
-    @property
-    def parameters(self) -> dict:
-        params = {
-            "q_max": float(self.sampling.q_max),
-            "n_q": int(self.sampling.n_q),
-            "method": self.method,
-            "interpolator": self.interpolator,
-        }
-        if self.sampling.q_grid is not None:
-            params["q_grid"] = [float(x) for x in np.asarray(self.sampling.q_grid)]
-        params.update(self.quadrature.selected_parameters)
-        return params
-
-    def transform(self, decomposition, *, check: bool = False):
-        """Build a production transform using the verified parameters only.
-
-        ``check`` defaults to ``False`` because the expensive convergence study
-        has already certified these parameters.  Set it to ``True`` only when
-        you also want the heuristic fast fault detectors for comparison.
-        """
-        from .interaction import HarmonicTransform
-
-        field = HarmonicTransform(decomposition, check=check, **self.parameters)
-        field._sampling_convergence = self.sampling
-        field._quadrature_convergence = self.quadrature
-        return field
-
-    def __str__(self) -> str:
-        p = self.parameters
-        lines = [
-            "HarmonicTransform convergence",
-            "-----------------------------",
-            f"numerical target (rtol) : {self.rtol:.1e}",
-            f"absolute target (atol)  : {self.atol:.1e}",
-            f"q-tail target           : {self.q_tail_rtol:.1e}  (relative L2 norm beyond q_max)",
-            f"q_max                   : {p['q_max']:.6g}",
-            f"n_q                     : {p['n_q']}",
-            f"method                  : {p['method']}",
-        ]
-        if "subdivisions" in p:
-            lines.append(f"radial subdivisions     : {p['subdivisions']}")
-        if "N" in p:
-            lines.append(f"Ogata N                 : {p['N']}")
-        if "h" in p:
-            lines.append(f"Ogata h                 : {p['h']:.6g}")
-        lines.extend(
-            [
-                "",
-                f"q support               : {'PASS' if self.sampling.tail_converged else 'FAIL'}",
-                f"q-grid interpolation    : {'PASS' if self.sampling.interpolation_converged else 'FAIL'}",
-                f"radial quadrature       : {'PASS' if self.quadrature.converged else 'FAIL'}",
-            ]
-        )
-        return "\n".join(lines)
-
-    def to_dict(self) -> dict:
-        return {
-            "converged": self.converged,
-            "rtol": float(self.rtol),
-            "atol": float(self.atol),
-            "q_tail_rtol": float(self.q_tail_rtol),
-            "parameters": self.parameters,
-            "sampling": self.sampling.to_dict(),
-            "quadrature": self.quadrature.to_dict(),
         }
 
 
@@ -340,7 +245,7 @@ def _dyadic_uniform_grid(q_max: float, target_intervals: int) -> np.ndarray:
     support windows exactly nested, enabling direct-transform reuse.
     """
     target_intervals = max(4, int(target_intervals))
-    intervals = 1 << int(math.ceil(math.log2(target_intervals)))
+    intervals = 1 << math.ceil(math.log2(target_intervals))
     return np.linspace(0.0, float(q_max), intervals + 1)
 
 
@@ -357,7 +262,7 @@ def _adaptive_interpolation_grid(
     maximum_points: int = 4097,
     maximum_iterations: int = 14,
 ) -> tuple[np.ndarray, float, list[QInterpolationStep]]:
-    """Certify a nonuniform q grid by direct interval-wise transform checks.
+    """Converge a nonuniform q grid by direct interval-wise transform checks.
 
     The refinement strategy makes no smoothness or functional-form assumption.
     At every iteration the interpolant is checked against direct Hankel values
@@ -365,7 +270,7 @@ def _adaptive_interpolation_grid(
     interval.  Refinement is local, but acceptance uses the same global relative
     L2 and peak-normalized absolute criteria as the legacy uniform-grid study.
 
-    If the adaptive grid cannot certify within ``maximum_points`` or
+    If the adaptive grid cannot satisfy the checks within ``maximum_points`` or
     ``maximum_iterations``, the caller may fall back to the legacy uniform-grid
     search without weakening the convergence requirement.
     """
@@ -495,7 +400,7 @@ def _adaptive_parseval_support(
     maximum_points: int = 8193,
     maximum_iterations: int = 20,
 ) -> tuple[float, float, float, dict[int, QTailModeResult]]:
-    """Certify q support with adaptive integration of the Parseval density.
+    """Select q support with adaptive integration of the Parseval density.
 
     For each retained harmonic the non-negative spectral density
     ``q |F_m(q)|^2`` integrates to the represented radial norm by Plancherel.
@@ -507,7 +412,7 @@ def _adaptive_parseval_support(
     indicator.  The support threshold is selected from a conservative
     cumulative lower estimate ``I - error``.  This is an accelerator, not the
     sole safety mechanism: the public support routine falls back to the dense
-    nested pilot if this adaptive study cannot certify the requested budget.
+    nested pilot if this adaptive study cannot satisfy the requested budget.
     """
     m_values = list(supports)
     nonzero_modes = [m for m in m_values if radial_power[m] > 0.0]
@@ -583,7 +488,7 @@ def _adaptive_parseval_support(
                 )
                 # Standard composite-Simpson local error estimate.  It is used
                 # conservatively through the cumulative lower estimate below
-                # and verified by repeated local refinement.
+                # and checked by repeated local refinement.
                 error = np.abs(fine - coarse) / 15.0
                 integrals[m] = np.asarray(fine, dtype=float)
                 errors[m] = np.asarray(error, dtype=float)
@@ -599,7 +504,7 @@ def _adaptive_parseval_support(
 
             # Refine intervals responsible for most of the unresolved power
             # integral.  This is only a work-selection heuristic; every final
-            # interval remains represented in the cumulative certificate.
+            # interval remains represented in the cumulative support accounting.
             order = np.argsort(interval_priority)[::-1]
             refine = np.zeros(widths.size, dtype=bool)
             total_priority = float(np.sum(interval_priority))
@@ -696,13 +601,15 @@ def estimate_q_support(
     The radial Nyquist scale ``q_ceiling = pi / max(diff(r))`` is a hard upper
     bound, not an efficient pilot interval.  The support search therefore starts
     from the inexpensive scale-aware q-range estimate used by the normal
-    constructor and expands that interval only when the requested tail cannot be
-    certified.  Within each interval, the q integration is refined until both
+    constructor and expands that interval only when the requested tail
+    criterion cannot be met.  Within each interval, the q integration is refined
+    until both
     the Parseval remainder and the inferred threshold crossing stabilize.
 
     This avoids evaluating a dense Hankel transform over momentum ranges that
-    contain essentially no represented norm.  Failure to certify a retained
-    harmonic before the radial-sampling ceiling still raises ``RuntimeError``.
+    contain essentially no represented norm.  Failure to satisfy the tail
+    criterion for a retained harmonic before the radial-sampling ceiling still raises
+    ``RuntimeError``.
     """
     q_tail_rtol = float(q_tail_rtol)
     if not np.isfinite(q_tail_rtol) or not (0.0 < q_tail_rtol < 1.0):
@@ -740,7 +647,7 @@ def estimate_q_support(
     except RuntimeError:
         # The adaptive Parseval integration is only an accelerator.  Difficult
         # or pathological cases fall back to the dense nested pilot below,
-        # which preserves the previous certification semantics.
+        # which preserves the previous acceptance semantics.
         pass
 
     # A relative-L2 tail target q_tail_rtol corresponds to a tail-power
@@ -779,12 +686,12 @@ def estimate_q_support(
                 raise ValueError("pilot_oversampling values must be positive.")
             target_intervals = max(
                 32,
-                int(math.ceil(oversampling * q_window * R_max / np.pi)),
+                math.ceil(oversampling * q_window * R_max / np.pi),
             )
             q = _dyadic_uniform_grid(q_window, target_intervals)
             transforms = transform_cache.evaluate(q)
             mode_results: dict[int, QTailModeResult] = {}
-            all_certified = True
+            all_resolved = True
             window_insufficient = False
 
             for m in m_values:
@@ -810,7 +717,7 @@ def estimate_q_support(
                     # cannot fix missing support, so expand it immediately.
                     window_insufficient = True
 
-                # q_required is read from a discrete pilot grid.  Certification
+                # q_required is read from a discrete pilot grid.  Acceptance
                 # therefore requires agreement under one q-grid refinement to
                 # within one cell of the coarser pilot.
                 previous = previous_q_required.get(m)
@@ -819,7 +726,7 @@ def estimate_q_support(
                     stable = abs(q_required - previous) <= previous_dq
 
                 resolved = bool(parseval_ok and q_required is not None and stable)
-                all_certified = all_certified and resolved
+                all_resolved = all_resolved and resolved
                 mode_results[m] = QTailModeResult(
                     m=m,
                     q_required=q_required,
@@ -829,7 +736,7 @@ def estimate_q_support(
                 )
 
             last_results = mode_results
-            if all_certified:
+            if all_resolved:
                 chosen_oversampling = oversampling
                 q_max = max(float(item.q_required) for item in mode_results.values())
                 # One pilot interval of headroom avoids selecting a support
@@ -867,7 +774,7 @@ def estimate_q_support(
         for m in unresolved
     )
     raise RuntimeError(
-        "Could not certify q-space support before the radial-sampling ceiling. "
+        "Could not satisfy q-space support before the radial-sampling ceiling. "
         "The PETAL2D radial sampling/support may be insufficient for the requested "
         f"q_tail_rtol={q_tail_rtol:.3e}. {details}"
     )
@@ -896,9 +803,10 @@ def converge_q_interpolation(
     uses the same global relative-L2 and peak-normalized absolute criteria as
     the legacy uniform-grid study.
 
-    The adaptive search is an accelerator, not a weaker certificate.  If it
-    cannot certify within the configured point limit, this function falls back
-    to the legacy uniform-grid search over ``oversampling_values``.
+    The adaptive search is an accelerator and does not weaken the acceptance
+    criteria.  If it cannot satisfy them within the configured point limit, this
+    function falls back to the legacy uniform-grid search over
+    ``oversampling_values``.
     """
     q_max = float(q_max)
     rtol = float(rtol)
@@ -923,7 +831,7 @@ def converge_q_interpolation(
             )
         except RuntimeError:
             # Conservative fallback: use the previous all-interval uniform-grid
-            # certificate rather than relaxing the acceptance condition.
+            # acceptance check rather than relaxing the acceptance condition.
             pass
 
     m_values = [int(m) for m in decomposition.m_sorted]
@@ -939,7 +847,7 @@ def converge_q_interpolation(
 
     for oversampling in oversampling_values:
         oversampling = float(oversampling)
-        n_q = max(4, 1 + int(math.ceil(oversampling * q_max * R_max / np.pi)))
+        n_q = max(4, 1 + math.ceil(oversampling * q_max * R_max / np.pi))
         q = np.linspace(0.0, q_max, n_q)
         dq = np.diff(q)
         q_check = np.sort(

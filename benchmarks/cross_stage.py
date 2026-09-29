@@ -13,12 +13,13 @@ The comparison therefore detects errors introduced by composing adaptive
 q-support/q-grid selection with the downstream interaction integration, while
 leaving the stage-isolated validation datasets unchanged.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -26,9 +27,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from quartic2d import HarmonicTransform
 from benchmarks._common import environment_metadata
-from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
 from benchmarks._interaction_suite import (
     DEFAULT_SUBDIVISIONS,
     FFTLOG_BIAS_VALUES_LARGE,
@@ -38,12 +37,14 @@ from benchmarks._interaction_suite import (
     benchmark_cases,
     build_fields_from_harmonic_results,
     displacement_grid,
-    kernel_registry,
     interaction_class,
+    kernel_registry,
     relative_l2,
     relative_peak,
     stable_reference_pair,
 )
+from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
+from quartic2d import HarmonicTransform
 
 
 def _write(path: Path, result: dict):

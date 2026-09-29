@@ -1,9 +1,9 @@
-"""Hankel transforms and radial interaction integrals in two dimensions."""
+"""Four-center interaction evaluation from angular-harmonic Hankel transforms."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
 import warnings
+from collections.abc import Callable, Iterable
 
 import numpy as np
 import petal2d
@@ -17,21 +17,21 @@ from ._diagnostics import (
     inspect_transform,
     radial_q_ceiling,
 )
-
 from ._numerics import (
     Interpolator1D,
+    _fftlog_hankel_transform_many,
+    _require_hankel,
+    _validate_interaction_method,
+    _validate_radial_method,
     common_grid,
     composite_gauss_nodes_weights,
     extrapolate_q_times_kernel_zero,
     fftlog_hankel_transform,
-    _fftlog_hankel_transform_many,
     hankel_transform_sampled,
     subdivide_grid,
     validate_interpolator,
-    _validate_radial_method,
-    _validate_interaction_method,
-    _require_hankel,
 )
+from .convergence import HarmonicConvergenceResult, InteractionConvergenceResult
 
 __all__ = ["HankelTransform", "HarmonicTransform", "Interaction"]
 
@@ -66,8 +66,8 @@ class HankelTransform:
         are ignored.  ``None`` uses the entire supplied radial interval.
     method : {'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}, default='simpson'
         Numerical rule used to evaluate the radial integral.  Simpson is the
-        general-purpose default; the other methods are primarily useful for
-        verification or specialist workloads.
+        release default.  Method-specific convergence and validation behavior
+        is documented separately from this constructor contract.
     interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
         How the sampled radial profile is evaluated between input grid points
         during quadrature.  Cubic interpolation is the benchmarked default.
@@ -193,8 +193,44 @@ class HankelTransform:
         subdivisions: int | None = None,
         N: int | None = None,
         h: float | None = None,
-    ) -> "HankelTransform":
-        """Change the numerical method and recompute the transform."""
+    ) -> HankelTransform:
+        """Select the radial quadrature and recompute the transform.
+
+        Parameters
+        ----------
+        method : {'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}
+            Radial integration method. ``trapezoid``, ``simpson``, ``gl4``,
+            and ``gl8`` operate on the sampled radial interval. ``ogata`` uses
+            the optional ``hankel`` dependency.
+        subdivisions : int or None, optional
+            Finite-grid refinement. When supplied, it replaces the stored
+            subdivision count used by ``trapezoid``, ``simpson``, ``gl4``,
+            and ``gl8``.
+        N : int or None, optional
+            Ogata node count. Used only by ``method='ogata'``.
+        h : float or None, optional
+            Positive Ogata resolution parameter. Used only by
+            ``method='ogata'``.
+
+        Returns
+        -------
+        HankelTransform
+            This instance after recomputing ``F_q``.
+
+        Raises
+        ------
+        ValueError
+            If ``method`` is unsupported or a supplied numerical parameter is
+            invalid.
+        ImportError
+            If ``method='ogata'`` and the optional ``hankel`` dependency is
+            unavailable.
+
+        Notes
+        -----
+        Method-specific parameters that are not supplied retain their current
+        values.
+        """
         self._method = _validate_radial_method(method, allow_experimental=type(self)._allow_experimental_methods)
         if subdivisions is not None:
             self._subdivisions = self._positive_int(subdivisions, "subdivisions")
@@ -208,8 +244,24 @@ class HankelTransform:
         self._compute()
         return self
 
-    def set_interpolator(self, interpolator: str) -> "HankelTransform":
-        """Change the interpolator and recompute the transform."""
+    def set_interpolator(self, interpolator: str) -> HankelTransform:
+        """Select the radial interpolator and recompute the transform.
+
+        Parameters
+        ----------
+        interpolator : {'linear', 'cubic', 'pchip'}
+            Interpolation used between the supplied radial samples.
+
+        Returns
+        -------
+        HankelTransform
+            This instance after recomputing ``F_q``.
+
+        Raises
+        ------
+        ValueError
+            If ``interpolator`` is not one of the supported names.
+        """
         self._interpolator = validate_interpolator(interpolator)
         self._compute()
         return self
@@ -225,10 +277,46 @@ class HankelTransform:
         maxiter: int = 15,
         apply: bool = False,
     ):
-        """Converge the active numerical method.
+        """Refine the active radial quadrature on the current input grids.
 
-        Finite-grid methods refine ``subdivisions``. Ogata delegates the
-        search for ``h`` and ``N`` to :func:`hankel.get_h`.
+        Parameters
+        ----------
+        rtol : float, default=1e-3
+            Relative self-convergence threshold between successive numerical
+            refinements.
+        atol : float, default=0
+            Absolute self-convergence threshold used together with ``rtol``.
+        subdivisions : iterable of int, default=(1, 2, 4, 8)
+            Candidate finite-grid subdivision counts, tried in order.
+        hstart : float, default=0.05
+            Initial Ogata resolution parameter.
+        hdecrement : float, default=2
+            Factor controlling the Ogata resolution search.
+        maxiter : int, default=15
+            Maximum number of Ogata search iterations.
+        apply : bool, default=False
+            If ``True``, apply the selected parameters to this object and
+            recompute the transform.
+
+        Returns
+        -------
+        ConvergenceResult
+            Internal self-convergence record and selected parameters.
+
+        Raises
+        ------
+        RuntimeError
+            If ``apply=True`` but the search does not produce converged
+            parameters.
+        ImportError
+            If the active method is ``'ogata'`` and the optional ``hankel``
+            dependency is unavailable.
+
+        Notes
+        -----
+        Finite-grid methods refine ``subdivisions``. Ogata searches ``N`` and
+        ``h``. The reported error is an internal refinement diagnostic, not an
+        independent reference error.
         """
         from ._convergence import converge_ogata, converge_sequence
 
@@ -337,8 +425,8 @@ class HarmonicTransform:
         radial profiles, capped safely below the momentum Nyquist limit implied
         by the PETAL2D radial spacing.  Supply a value when a downstream model
         requires a specific q range.  The fast diagnostics warn if the selected
-        range appears too short; ``converge_parameters`` quantitatively verifies
-        q-space support when needed.
+        range appears too short; ``converge_parameters`` performs the explicit
+        q-support refinement study when needed.
     n_q : int or None, optional
         Number of uniformly spaced momentum samples between 0 and ``q_max``.
         ``None`` chooses a conservative grid from the retained real-space
@@ -350,13 +438,14 @@ class HarmonicTransform:
     q_grid : array_like or None, optional
         Explicit strictly increasing momentum grid beginning at zero.  This is
         primarily used by ``converge_parameters`` to reuse its directly
-        certified adaptive q grid in production.  Supplying an explicit grid
+        converged adaptive q grid in production.  Supplying an explicit grid
         does not weaken interpolation checks; the convergence helper verifies
         every final interval against direct Hankel evaluations before returning
         it.
     method : {'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}, default='simpson'
         Numerical rule used for the radial Hankel integral.  Simpson is the
-        default because the benchmark suite found a good accuracy/cost balance.
+        release default.  Method-specific validation and performance evidence
+        are documented separately from this API contract.
     interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
         Interpolation used between the PETAL2D radial samples.  Cubic
         interpolation of the resulting q-space form factors uses not-a-knot end
@@ -365,10 +454,9 @@ class HarmonicTransform:
     subdivisions : int, default=2
         Radial integration refinement for finite-grid methods.  A value of 2
         splits every original PETAL2D radial interval once before composite
-        Simpson integration.  Direct finite-domain reference tests across the
-        non-discontinuous validation suite gave worst relative L2 and maximum
-        errors below 1e-4 at this setting.  Larger values cost approximately
-        linearly and are available when a case requires separate convergence.
+        Simpson integration.  Larger values cost approximately linearly and are
+        available when a case requires explicit convergence.  Validation of the
+        release default is reported separately from this parameter definition.
     N : int, default=2048
         Number of Ogata quadrature nodes when ``method='ogata'``.  Larger values
         provide a denser Ogata representation at higher computational cost.
@@ -507,11 +595,11 @@ class HarmonicTransform:
         subdivisions: Iterable[int] = (1, 2, 4, 8, 16, 32),
         pilot_subdivisions: int = 2,
         verbose: bool = True,
-    ):
+    ) -> HarmonicConvergenceResult:
         r"""Find harmonic-transform parameters that meet explicit numerical tolerances.
 
-        This is the *expensive*, opt-in calibration path.  Normal transforms do
-        not call it.  The routine verifies three independent numerical choices:
+        This is the expensive, opt-in calibration path.  Normal transforms do
+        not call it.  The routine refines three independent numerical choices:
 
         1. ``q_max`` -- how far the momentum-space transform must be followed
            before the omitted q-space norm is small;
@@ -525,12 +613,16 @@ class HarmonicTransform:
         decomposition : petal2d.PolarDecomposition
             Retained PETAL2D angular harmonics and their radial profiles.
         rtol : float, default=1e-4
-            Relative numerical tolerance for q-grid interpolation and radial
-            quadrature.  This controls discretization *within* the represented
-            q interval; it does not determine how much q-space may be omitted.
+            Internal self-convergence threshold for q-grid interpolation and
+            radial quadrature on the represented q interval.  Acceptance uses
+            both relative L2 change <= ``rtol`` and maximum absolute change <=
+            ``atol + rtol * peak``.  Relative Linf change is retained as a
+            diagnostic only.  This criterion does not determine how much
+            q-space may be omitted and is not an independent reference-error
+            guarantee.
         atol : float, default=1e-12
-            Absolute companion to ``rtol``.  It prevents near-zero values from
-            being judged by relative error alone.
+            Absolute floor in the peak-scaled maximum-change condition used
+            together with ``rtol``.
         q_tail_rtol : float, default=1e-3
             Maximum relative L2 norm allowed outside the selected ``q_max`` for
             every retained harmonic.  This is a momentum-support/truncation
@@ -538,9 +630,9 @@ class HarmonicTransform:
             the interaction benchmark; choose a smaller value when the form
             factors themselves require stricter tail control.
         method : {'trapezoid', 'simpson', 'gl4', 'gl8'}, default='simpson'
-            Radial quadrature backend to calibrate.  Simpson is the release
-            default because it gave the best accuracy/cost balance in the
-            benchmark suite.
+            Radial quadrature method to calibrate.  Simpson is the release
+            default; validation evidence for the tested workload portfolio is
+            reported separately in the numerical-method and validation pages.
         interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
             Interpolation used for the sampled PETAL2D radial profiles and the
             tabulated form factors.  Cubic q-space interpolation uses
@@ -552,11 +644,11 @@ class HarmonicTransform:
             radial integration cost approximately linearly.
         pilot_subdivisions : int, default=2
             Initial radial refinement used by the canonical Simpson pilot that
-            certifies q support and q-grid density.  Sampling is a property of
+            converges q support and q-grid density.  Sampling is a property of
             the represented transform rather than of the production quadrature
             backend.  If the requested backend requires a finer radial
             refinement, only the canonical sampling study is repeated at that
-            finer resolution before returning the verified parameters.
+            finer resolution before returning the selected parameters.
         verbose : bool, default=True
             Print one compact convergence report.  Set to ``False`` for batch
             jobs; the returned result still contains the full diagnostics.
@@ -564,15 +656,16 @@ class HarmonicTransform:
         Returns
         -------
         HarmonicConvergenceResult
-            Reusable verified parameters.  ``result.transform(decomposition)``
-            builds a production transform without rerunning convergence.
+            Calibration result containing the selected parameters and full
+            refinement diagnostics.  Check ``result.converged`` before using
+            ``result.transform(decomposition)`` to build a production transform.
 
         Notes
         -----
         Convergence is intentionally separate from the ordinary constructor so
         that production transforms pay only for the requested calculation.
         """
-        from ._sampling import HarmonicConvergenceResult, converge_q_sampling
+        from ._sampling import converge_q_sampling
 
         method = _validate_radial_method(method, allow_experimental=cls._allow_experimental_methods)
         if method == "ogata":
@@ -591,10 +684,10 @@ class HarmonicTransform:
         # momentum-space function, not the production quadrature backend.
         # Calibrate them with the benchmarked Simpson pilot and converge the
         # requested radial quadrature independently on that q grid.  If the
-        # requested backend proves that the radial representation itself needs
-        # finer refinement, repeat only the canonical Simpson sampling study at
-        # that finer resolution.  The sampling refinement is monotonic, so this
-        # cannot bounce between candidate levels.
+        # requested method shows that the radial representation needs finer
+        # refinement, repeat only the canonical Simpson sampling study at that
+        # finer ordered resolution.  Candidate refinements increase strictly,
+        # so the loop cannot return to a coarser level.
         for _ in range(3):
             sampling = converge_q_sampling(
                 decomposition,
@@ -671,8 +764,8 @@ class HarmonicTransform:
     def diagnostics(self):
         """Fast post-transform sanity checks for the current numerical grid.
 
-        The diagnostics are indicators, not convergence certificates.  In
-        particular, ``boundary_power_fraction`` describes power *inside the
+        The diagnostics are indicators, not quantitative convergence results.
+        In particular, ``boundary_power_fraction`` describes power *inside the
         sampled interval near its upper edge*; it is not an estimate of the
         omitted tail beyond ``q_max``.
         """
@@ -680,12 +773,12 @@ class HarmonicTransform:
 
     @property
     def sampling_convergence(self):
-        """Verified q-support/q-grid result when built from convergence output."""
+        """q-support/q-grid convergence result when built from convergence output."""
         return self._sampling_convergence
 
     @property
     def quadrature_convergence(self):
-        """Verified radial-quadrature result when built from convergence output."""
+        """Radial-quadrature convergence result when built from convergence output."""
         return self._quadrature_convergence
 
     def __getitem__(self, m: int) -> np.ndarray:
@@ -706,8 +799,43 @@ class HarmonicTransform:
         subdivisions: int | None = None,
         N: int | None = None,
         h: float | None = None,
-    ) -> "HarmonicTransform":
-        """Change the numerical method and recompute all harmonics."""
+    ) -> HarmonicTransform:
+        """Select the radial quadrature and recompute all retained harmonics.
+
+        Parameters
+        ----------
+        method : {'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}
+            Radial Hankel-transform method.
+        subdivisions : int or None, optional
+            Finite-grid refinement used by ``trapezoid``, ``simpson``,
+            ``gl4``, and ``gl8``.
+        N : int or None, optional
+            Ogata node count. Used only by ``method='ogata'``.
+        h : float or None, optional
+            Positive Ogata resolution parameter. Used only by
+            ``method='ogata'``.
+
+        Returns
+        -------
+        HarmonicTransform
+            This instance after recomputing all ``F_m(q)`` values.
+
+        Raises
+        ------
+        ValueError
+            If ``method`` is unsupported or a supplied numerical parameter is
+            invalid.
+        ImportError
+            If ``method='ogata'`` and the optional ``hankel`` dependency is
+            unavailable.
+
+        Notes
+        -----
+        Method-specific parameters that are not supplied retain their current
+        values. Changing the method clears any attached q-sampling and radial-
+        quadrature convergence records because those records refer to the
+        previous numerical representation.
+        """
         self._method = _validate_radial_method(method, allow_experimental=type(self)._allow_experimental_methods)
         if subdivisions is not None:
             self._subdivisions = HankelTransform._positive_int(subdivisions, "subdivisions")
@@ -723,8 +851,29 @@ class HarmonicTransform:
         self._compute()
         return self
 
-    def set_interpolator(self, interpolator: str) -> "HarmonicTransform":
-        """Change the interpolator and recompute all harmonics."""
+    def set_interpolator(self, interpolator: str) -> HarmonicTransform:
+        """Select the radial interpolator and recompute all retained harmonics.
+
+        Parameters
+        ----------
+        interpolator : {'linear', 'cubic', 'pchip'}
+            Interpolation used between the PETAL2D radial samples.
+
+        Returns
+        -------
+        HarmonicTransform
+            This instance after recomputing all ``F_m(q)`` values.
+
+        Raises
+        ------
+        ValueError
+            If ``interpolator`` is not one of the supported names.
+
+        Notes
+        -----
+        Changing the interpolator clears the attached q-sampling and radial-
+        quadrature convergence records.
+        """
         self._interpolator = validate_interpolator(interpolator)
         self._sampling_convergence = None
         self._quadrature_convergence = None
@@ -744,31 +893,51 @@ class HarmonicTransform:
     ):
         """Converge only the radial quadrature on the current q grid.
 
-        This low-level helper leaves ``q_max`` and ``n_q`` unchanged.  Finite
+        This low-level helper leaves ``q_max`` and ``n_q`` unchanged. Finite
         methods repeat each retained harmonic with progressively larger
         ``subdivisions`` and choose a common value sufficient for all modes.
-        ``rtol`` and ``atol`` compare successive radial-quadrature resolutions.
         Use :meth:`converge_parameters` when q support and q-grid interpolation
-        must also be calibrated.
+        must also be included in the convergence search.
 
         Parameters
         ----------
         rtol : float, default=1e-3
-            Relative agreement required between successive radial quadrature
-            refinements.
+            Relative self-convergence threshold between successive radial
+            quadrature refinements.
         atol : float, default=0
-            Absolute agreement used together with ``rtol`` for values near zero.
+            Absolute self-convergence threshold used together with ``rtol``.
         subdivisions : iterable of int, default=(1, 2, 4, 8)
-            Candidate finite-grid refinements, tried in order.  Each value is
+            Candidate finite-grid refinements, tried in order. Each value is
             the number of integration panels placed inside one original radial
             interval.
-        hstart, hdecrement, maxiter
-            Ogata-only search controls passed to ``hankel.get_h``.  They do not
-            affect finite-grid methods.
+        hstart : float, default=0.05
+            Initial Ogata resolution parameter.
+        hdecrement : float, default=2
+            Factor controlling the Ogata resolution search.
+        maxiter : int, default=15
+            Maximum number of Ogata search iterations for each retained mode.
         apply : bool, default=False
             If ``True``, recompute this object with the selected radial
-            quadrature parameters.  The convergence study itself is performed
-            either way.
+            quadrature parameters.
+
+        Returns
+        -------
+        ConvergenceResult
+            Internal self-convergence record and selected parameters.
+
+        Raises
+        ------
+        RuntimeError
+            If ``apply=True`` but the search does not produce converged
+            parameters.
+        ImportError
+            If the active method is ``'ogata'`` and the optional ``hankel``
+            dependency is unavailable.
+
+        Notes
+        -----
+        The reported error compares numerical refinements. It is not an
+        independent reference error.
         """
         from ._convergence import (
             ConvergenceResult,
@@ -929,7 +1098,20 @@ class HarmonicTransform:
         return result
 
     def plot_harmonics(self, title: str = "Hankel-transformed radial profiles"):
-        """Plot all retained, converged momentum-space harmonic profiles."""
+        """Plot the retained momentum-space harmonic profiles.
+
+        Parameters
+        ----------
+        title : str, default="Hankel-transformed radial profiles"
+            Figure title. Pass an empty string to suppress it.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            Created figure.
+        axes : ndarray of matplotlib.axes.Axes
+            Real- and imaginary-part axes.
+        """
         from matplotlib import pyplot as plt
 
         fig, axes = plt.subplots(2, 1, sharex=True, figsize=(7.2, 6.0))
@@ -950,81 +1132,91 @@ class HarmonicTransform:
         return fig, axes
 
     def plot_convergence(self, title: str = "Harmonic-transform convergence"):
-        """Plot q support, q interpolation, and quadrature convergence diagnostics."""
-        from matplotlib import pyplot as plt
+        """Plot the attached automatic-convergence record.
 
+        This delegates to the :class:`HarmonicConvergenceResult` associated
+        with the calibrated production transform.
+
+        Parameters
+        ----------
+        title : str, default="Harmonic-transform convergence"
+            Figure title. Pass an empty string to suppress it.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            Created figure.
+        axes : ndarray of matplotlib.axes.Axes
+            Convergence-diagnostic axes.
+
+        Raises
+        ------
+        RuntimeError
+            If the transform was not constructed from
+            ``HarmonicTransform.converge_parameters(...)``.
+        """
         if self._sampling_convergence is None or self._quadrature_convergence is None:
             raise RuntimeError(
                 "No convergence record is attached. Run "
                 "HarmonicTransform.converge_parameters(...) and build the field "
                 "with result.transform(decomposition)."
             )
+        from .convergence import HarmonicConvergenceResult
 
-        sampling = self._sampling_convergence
-        quadrature = self._quadrature_convergence
-        fig, axes = plt.subplots(1, 3, figsize=(13.0, 3.8))
-
-        # q support selected independently for every retained harmonic.
-        modes = [int(m) for m in self._m_values]
-        required = [sampling.tail_modes[m].q_required for m in modes]
-        axes[0].plot(modes, required, "o")
-        axes[0].axhline(sampling.q_max, linestyle="--", label="selected q_max")
-        ymax = 1.25 * max([sampling.q_max, *[float(value) for value in required]])
-        axes[0].set_ylim(0.0, ymax)
-        axes[0].text(
-            0.03,
-            0.95,
-            f"radial-sampling ceiling = {sampling.q_ceiling:.4g}",
-            transform=axes[0].transAxes,
-            va="top",
+        result = HarmonicConvergenceResult(
+            sampling=self._sampling_convergence,
+            quadrature=self._quadrature_convergence,
+            method=self._method,
+            interpolator=self._interpolator,
+            rtol=float(self._quadrature_convergence.rtol),
+            atol=float(self._quadrature_convergence.atol),
+            q_tail_rtol=float(self._sampling_convergence.q_tail_rtol),
         )
-        axes[0].set_xlabel("harmonic m")
-        axes[0].set_ylabel("required q")
-        axes[0].legend()
-        axes[0].grid(True, alpha=0.2)
-
-        # Off-grid interpolation verification.
-        for m in modes:
-            x = [step.n_q for step in sampling.interpolation_steps]
-            y = [step.harmonic_errors[m]["relative_l2"] for step in sampling.interpolation_steps]
-            axes[1].plot(x, y, marker="o", label=f"m={m}")
-        axes[1].axhline(sampling.interpolation_rtol, linestyle="--", label="target")
-        axes[1].set_yscale("log")
-        axes[1].set_xlabel("n_q")
-        axes[1].set_ylabel("off-grid relative L2 error")
-        axes[1].legend()
-        axes[1].grid(True, alpha=0.2)
-
-        # Per-harmonic radial quadrature convergence.
-        qmeta = quadrature.metadata.get("harmonics", {})
-        for m in modes:
-            item = qmeta.get(str(m), {})
-            steps = item.get("steps", [])
-            x = [step["parameters"]["subdivisions"] for step in steps if step["relative_l2_change"] is not None]
-            y = [step["relative_l2_change"] for step in steps if step["relative_l2_change"] is not None]
-            if x:
-                axes[2].plot(x, y, marker="o", label=f"m={m}")
-        axes[2].axhline(quadrature.rtol, linestyle="--", label="target")
-        axes[2].set_yscale("log")
-        axes[2].set_xlabel("radial subdivisions")
-        axes[2].set_ylabel("successive relative L2 change")
-        axes[2].legend()
-        axes[2].grid(True, alpha=0.2)
-
-        if title:
-            fig.suptitle(title)
-        fig.tight_layout()
-        return fig, axes
+        return result.plot_convergence(title=title)
 
     def plot(self, *, title: str = "Hankel-transformed radial profiles", show_convergence: bool = False):
-        """Plot transformed harmonics and, when available, convergence diagnostics."""
+        """Plot transformed harmonics and optionally the convergence record.
+
+        Parameters
+        ----------
+        title : str, default="Hankel-transformed radial profiles"
+            Title for the harmonic-profile figure.
+        show_convergence : bool, default=False
+            If ``True``, also return the attached convergence figure.
+
+        Returns
+        -------
+        profiles : tuple
+            ``(fig, axes)`` returned by :meth:`plot_harmonics`.
+        convergence : tuple, optional
+            ``(fig, axes)`` returned by :meth:`plot_convergence` when
+            ``show_convergence=True``.
+
+        Raises
+        ------
+        RuntimeError
+            If ``show_convergence=True`` and no convergence record is attached.
+        """
         profiles = self.plot_harmonics(title=title)
         if show_convergence:
             return profiles, self.plot_convergence()
         return profiles
 
     def roundtrip_error(self) -> float:
-        """Return the power-weighted relative L2 forward/inverse error."""
+        """Return the power-weighted relative L2 round-trip error.
+
+        Returns
+        -------
+        float
+            Relative L2 difference between the retained PETAL2D radial
+            harmonics and their forward/inverse Hankel reconstruction.
+
+        Notes
+        -----
+        This is a numerical consistency diagnostic for the represented field;
+        it is not an independent reference error for the original Cartesian
+        input.
+        """
         total_error_sq = 0.0
         for m_raw in self._m_values:
             m = int(m_raw)
@@ -1109,7 +1301,7 @@ class HarmonicTransform:
 
 
 class _BoundaryTaperedField:
-    """Read-only momentum field with a smooth taper at verified q support.
+    """Read-only momentum field with a smooth taper at converged q support.
 
     This helper is used only as a downstream robustness probe during automatic
     Interaction calibration.  It preserves the native q grid and retained
@@ -1149,49 +1341,83 @@ class _BoundaryTaperedField:
 
 
 class Interaction:
-    r"""Evaluate a radial-kernel interaction between transformed fields.
+    r"""Evaluate four-center matrix elements from transformed transition fields.
+
+    For transition fields
+
+    .. math::
+
+        \rho_{13}(\mathbf r)=\phi_1^*(\mathbf r)\phi_3(\mathbf r),
+        \qquad
+        \rho_{42}(\mathbf r)=\phi_4^*(\mathbf r)\phi_2(\mathbf r),
+
+    ``Interaction`` evaluates the radial-kernel reduction of
+
+    .. math::
+
+        U_{1234}(\boldsymbol\delta)=
+        \iint d^2\mathbf s\,d^2\mathbf t\,
+        \rho_{13}(\mathbf s)
+        U(|\mathbf s-\mathbf t+\boldsymbol\delta|)
+        \rho_{42}^*(\mathbf t).
+
+    The two fields are supplied as :class:`HarmonicTransform` objects.  The
+    ordinary constructor performs one evaluation using explicit numerical
+    parameters.  :meth:`converge_parameters` is the recommended opt-in path
+    when the assembled interaction requires a recorded refinement study.
 
     Parameters
     ----------
     deltas : array_like, shape (D, 2)
-        Cartesian displacement vectors.
+        Cartesian displacement vectors :math:`\boldsymbol\delta`.
     field1, field2 : HarmonicTransform
-        Momentum-space harmonic representations.
+        Momentum-space harmonic representations of the two transition fields.
     U_q : callable
-        Radially symmetric momentum-space interaction kernel.
+        Scalar radial interaction kernel in momentum space.  The callable is
+        evaluated at non-negative momentum magnitudes.
     method : {'fftlog', 'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}, default='gl4'
-        Numerical method used for the interaction Hankel transform. GL4 is the
-        benchmarked general-purpose default; FFTLog is a high-throughput option
-        for compatible workloads, while Ogata is a public oscillatory specialist
-        with coupled ``(N, h)`` convergence support.
+        Numerical method used for the final radial interaction integrals.  The
+        methods have different convergence controls; see
+        :meth:`converge_parameters` and the numerical-method guide rather than
+        interpreting the method name as an accuracy ranking.
     interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
-        Interpolator used for sampled momentum-space harmonics.
+        Interpolator used for the sampled momentum-space harmonics.
     n : int, default=512
-        FFTLog sequence length.
+        FFTLog sequence length.  Used only for ``method='fftlog'``.
     bias : float, default=-0.5
-        FFTLog power-law bias parameter.
+        FFTLog power-law bias.  Used only for ``method='fftlog'``.
     subdivisions : int, default=1
-        Equal subdivisions of each original momentum interval for finite-grid
-        methods.
+        Number of equal finite-rule subdivisions per original momentum
+        interval.  Used by ``trapezoid``, ``simpson``, ``gl4``, and ``gl8``.
     N : int, default=1024
-        Ogata node count.
+        Ogata node count.  Used only for ``method='ogata'``.
     h : float or None, optional
-        Ogata resolution parameter.
+        Ogata resolution parameter.  ``None`` selects the package default for
+        the requested ``N``.
 
     Attributes
     ----------
     Phi_mm : ndarray
-        Complete angular prefactors for every harmonic pair and displacement,
-        including the parity factor required when the radial backends evaluate
-        the translation Bessel function at nonnegative order ``|m-m'|``.
+        Angular prefactors for every harmonic pair and displacement.
     H_mm : ndarray
-        Radial Hankel integrals for every harmonic pair and displacement.
+        Radial interaction integrals for every harmonic pair and displacement.
     V_mm : ndarray
-        Harmonic-pair contributions to the interaction.
-    V : ndarray
+        Harmonic-pair contributions to the final matrix element.
+    V : ndarray, shape (D,)
         Total interaction for each displacement.
-    """
+    convergence : InteractionConvergenceResult or None
+        Calibration record attached when the object is constructed through
+        :meth:`InteractionConvergenceResult.interaction`.
 
+    See Also
+    --------
+    Interaction.converge_parameters
+        Recommended interaction-level calibration workflow.
+    InteractionConvergenceResult
+        Reusable selected parameters and convergence history.
+    HarmonicTransform
+        Momentum-space representation of one transition field.
+    """
     _allow_experimental_methods = False
 
     def __init__(
@@ -1302,39 +1528,108 @@ class Interaction:
         q_boundary_taper_fraction: float = 0.1,
         q_boundary_budget_fraction: float = 0.5,
         verbose: bool = True,
-    ):
-        r"""Find interaction-transform parameters that meet an explicit tolerance.
+    ) -> InteractionConvergenceResult:
+        r"""Calibrate the assembled interaction for explicit numerical criteria.
 
-        This is the expensive, opt-in calibration path.  It converges the
-        interaction integral on the momentum-space fields supplied here.  When
-        either input is a HarmonicTransform built from automatic q-sampling, a
-        second downstream robustness probe smoothly tapers the outer 10% of that
-        verified q interval and requires the requested interaction to remain
-        stable.  This prevents a numerically converged backend from certifying an
-        observable that is still sensitive to the finite upstream q boundary.
-        Generic fixed fields without an attached q-sampling certificate retain
-        the historical represented-input semantics.
+        This is the recommended quantitative convergence entry point for
+        ``Interaction``.  It selects method-specific numerical parameters from
+        self-convergence tests of the assembled interaction over the supplied
+        displacement set.  The requested ``rtol`` is therefore a refinement
+        criterion, not an independent reference-error guarantee.
 
-        Finite-grid rules exploit their known asymptotic order and use a
-        three-resolution Richardson check before selecting the cheapest verified
-        subdivision count.  FFTLog is required to stabilize both with transform
-        length and across a local bias window, preventing an ``n``-stable but
-        bias-sensitive accuracy floor from being certified.  Ogata is converged
-        directly on the assembled interaction in the coupled ``(N, h)`` space;
-        it does not depend on ``hankel.get_h`` successfully converging each
-        harmonic-pair integrand.
+        Finite-grid rules use their known asymptotic order together with a
+        three-resolution Richardson check.  FFTLog must stabilize with both
+        transform length and a local bias window.  Ogata is calibrated directly
+        on the assembled interaction in the coupled ``(N, h)`` space.  When an
+        input ``HarmonicTransform`` carries automatic q-sampling metadata, an
+        optional downstream q-boundary probe also tests sensitivity to the
+        finite represented support.
 
-        The returned object stores the complete search history and can construct
-        a production :class:`Interaction` without rerunning convergence.
+        Parameters
+        ----------
+        deltas : array_like, shape (D, 2)
+            Cartesian displacement vectors included in the convergence study.
+            The selected parameters are justified for this tested displacement
+            domain; extending the domain can require recalibration.
+        field1, field2 : HarmonicTransform
+            Momentum-space transition fields used by the interaction.
+        U_q : callable
+            Scalar radial interaction kernel in momentum space.
+        rtol : float, default=1e-4
+            Relative self-convergence threshold applied to successive
+            interaction values.  Acceptance is paired with the peak-scaled
+            absolute condition controlled by ``atol``.  For finite-grid rules
+            the internal search uses a safety margin before reporting success.
+        atol : float, default=1e-12
+            Absolute floor in the peak-scaled maximum-change condition.
+        method : {'fftlog', 'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}, default='gl4'
+            Interaction integration method to calibrate.
+        interpolator : {'linear', 'cubic', 'pchip'}, default='cubic'
+            Interpolator used for the sampled momentum-space harmonics.
+        subdivisions : iterable of int, optional
+            Ordered candidate finite-rule subdivision counts.  Used by
+            ``trapezoid``, ``simpson``, ``gl4``, and ``gl8``.
+        n_values : iterable of int, optional
+            Ordered FFTLog sequence lengths used for resolution refinement.
+        bias : float, default=-0.5
+            Preferred FFTLog bias around which robustness is tested.
+        bias_values : iterable of float, optional
+            FFTLog bias values used to establish a local robust window.  An
+            ``n``-stable but bias-sensitive result is not accepted.
+        hstart : float, default=0.05
+            Initial Ogata resolution parameter used by the coupled search.
+        hdecrement : float, default=2.0
+            Multiplicative refinement factor applied to the Ogata ``h`` search.
+        maxiter : int, default=20
+            Maximum number of Ogata ``h`` refinements per tested node count.
+        ogata_n_values : iterable of int, optional
+            Ordered Ogata node counts tested during coupled ``(N, h)``
+            calibration.
+        ogata_verification_levels : int, default=4
+            Number of subsequent Ogata resolution levels required to remain
+            stable after the first accepted candidate.
+        q_boundary_check : bool, default=True
+            If ``True`` and either input carries automatic q-sampling metadata,
+            test the assembled interaction against a smooth taper near the
+            outer represented q boundary.
+        q_boundary_taper_fraction : float, default=0.1
+            Fraction of the represented q interval over which the robustness
+            probe applies its half-cosine taper.  Must satisfy ``0 < value < 1``.
+        q_boundary_budget_fraction : float, default=0.5
+            Fraction of the requested ``rtol``/``atol`` budget allocated to the
+            q-boundary robustness probe.  Must satisfy ``0 < value <= 1``.
+        verbose : bool, default=True
+            Print one compact convergence report.  Set to ``False`` for batch
+            calculations; the returned object retains the complete search.
+
+        Returns
+        -------
+        InteractionConvergenceResult
+            Reusable convergence result containing selected parameters and the
+            full method-specific search history.  Use
+            ``result.interaction(deltas, field1, field2, U_q)`` to construct a
+            production interaction without rerunning calibration.
+
+        Raises
+        ------
+        ValueError
+            If method-specific controls or q-boundary settings are invalid.
+
+        Notes
+        -----
+        ``result.converged`` describes the configured internal refinement and
+        robustness criteria for the supplied represented inputs.  It does not
+        assert pointwise or global agreement with an unknown exact solution.
+        When an independent analytic or high-accuracy reference is available,
+        evaluate that error separately.
         """
         from ._convergence import (
-            InteractionConvergenceResult,
-            converge_fixed_order_sequence,
+            absolute_linf_error,
             converge_fftlog_bias_resolution,
+            converge_fixed_order_sequence,
             converge_ogata_coupled,
             relative_l2_error,
             relative_linf_error,
-            absolute_linf_error,
         )
 
         method = _validate_interaction_method(method, allow_experimental=cls._allow_experimental_methods)
@@ -1413,7 +1708,7 @@ class Interaction:
         elif method == "fftlog":
             # FFTLog has two independently tested numerical sensitivities:
             # transform length and bias.  Give each half of the requested
-            # tolerance so their combination is not certified merely because
+            # tolerance so their combination is not accepted merely because
             # both changes sit just below the final user target.
             search = converge_fftlog_bias_resolution(
                 evaluate,
@@ -1429,7 +1724,7 @@ class Interaction:
         else:
             # Converge the quantity users actually consume: the assembled
             # interaction.  N is first converged at fixed h; neighboring h
-            # plateaus then receive a second look-ahead verification.  A
+            # plateaus then receive a second look-ahead check.  A
             # quarter-tolerance internal budget leaves room for both N and h
             # truncation effects without relying on a per-pair get_h seed.
             search = converge_ogata_coupled(
@@ -1457,8 +1752,8 @@ class Interaction:
         # upstream support without an external reference by smoothly removing
         # only the final q-window and requiring the selected production result
         # to remain stable.  The check is intentionally limited to fields that
-        # carry an automatic q-sampling certificate; fixed user-supplied fields
-        # continue to mean "integrate the represented input as given".
+        # carry an automatic q-sampling convergence result; fixed user-supplied
+        # fields continue to mean "integrate the represented input as given".
         sampled_inputs = [
             field
             for field in (field1, field2)
@@ -1550,8 +1845,8 @@ class Interaction:
             interpolator=interpolator,
             rtol=float(rtol),
             atol=float(atol),
-            _interaction_class=cls,
         )
+        result._interaction_class = cls
         if verbose:
             print(result)
         return result
@@ -1576,6 +1871,42 @@ class Interaction:
         """Automatic convergence record attached to a calibrated production run."""
         return self._convergence_result
 
+    def plot_convergence(self, title: str = "Interaction convergence"):
+        """Plot the attached interaction-level convergence record.
+
+        Parameters
+        ----------
+        title : str, default="Interaction convergence"
+            Figure title. Pass an empty string to suppress it.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            Created figure.
+        axes : ndarray of matplotlib.axes.Axes
+            Method-specific convergence-diagnostic axes.
+
+        Raises
+        ------
+        RuntimeError
+            If the interaction was not constructed from
+            ``Interaction.converge_parameters(...)``.
+
+        Notes
+        -----
+        This method delegates to
+        :meth:`InteractionConvergenceResult.plot_convergence`.  The plot shows
+        internal self-convergence and robustness diagnostics, not an
+        independent reference error.
+        """
+        if self._convergence_result is None:
+            raise RuntimeError(
+                "No convergence record is attached. Run "
+                "Interaction.converge_parameters(...) and build the production "
+                "interaction with result.interaction(...)."
+            )
+        return self._convergence_result.plot_convergence(title=title)
+
     def set_method(
         self,
         method: str,
@@ -1585,8 +1916,47 @@ class Interaction:
         subdivisions: int | None = None,
         N: int | None = None,
         h: float | None = None,
-    ) -> "Interaction":
-        """Change the interaction-transform method and recompute ``V``."""
+    ) -> Interaction:
+        """Select the interaction quadrature and recompute ``V``.
+
+        Parameters
+        ----------
+        method : {'fftlog', 'trapezoid', 'simpson', 'gl4', 'gl8', 'ogata'}
+            Method used for the final radial interaction integrals.
+        n : int or None, optional
+            FFTLog sequence length. Used only by ``method='fftlog'``.
+        bias : float or None, optional
+            FFTLog power-law bias. Used only by ``method='fftlog'``.
+        subdivisions : int or None, optional
+            Finite-grid refinement used by ``trapezoid``, ``simpson``,
+            ``gl4``, and ``gl8``.
+        N : int or None, optional
+            Ogata node count. Used only by ``method='ogata'``.
+        h : float or None, optional
+            Positive Ogata resolution parameter. Used only by
+            ``method='ogata'``.
+
+        Returns
+        -------
+        Interaction
+            This instance after recomputing ``V`` and harmonic-pair
+            contributions.
+
+        Raises
+        ------
+        ValueError
+            If ``method`` is unsupported or a supplied numerical parameter is
+            invalid.
+        ImportError
+            If ``method='ogata'`` and the optional ``hankel`` dependency is
+            unavailable.
+
+        Notes
+        -----
+        Method-specific parameters that are not supplied retain their current
+        values. Changing the method clears cached Ogata data and any attached
+        interaction convergence record.
+        """
         self._method = _validate_interaction_method(method, allow_experimental=type(self)._allow_experimental_methods)
         if n is not None:
             self._fftlog_n = HankelTransform._positive_int(n, "n")
@@ -1609,8 +1979,30 @@ class Interaction:
         self._compute()
         return self
 
-    def set_interpolator(self, interpolator: str) -> "Interaction":
-        """Change the momentum-space interpolator and recompute ``V``."""
+    def set_interpolator(self, interpolator: str) -> Interaction:
+        """Select the momentum-space interpolator and recompute ``V``.
+
+        Parameters
+        ----------
+        interpolator : {'linear', 'cubic', 'pchip'}
+            Interpolation used for the sampled momentum-space harmonics.
+
+        Returns
+        -------
+        Interaction
+            This instance after recomputing ``V`` and harmonic-pair
+            contributions.
+
+        Raises
+        ------
+        ValueError
+            If ``interpolator`` is not one of the supported names.
+
+        Notes
+        -----
+        Changing the interpolator clears the harmonic interpolation caches and
+        any attached interaction convergence record.
+        """
         self._interpolator = validate_interpolator(interpolator)
         self._mode_cache1.clear()
         self._mode_cache2.clear()
@@ -1630,11 +2022,51 @@ class Interaction:
         maxiter: int = 15,
         apply: bool = False,
     ):
-        """Converge the active interaction-transform method.
+        """Refine the active interaction method at fixed transformed fields.
 
+        Parameters
+        ----------
+        rtol : float, default=1e-3
+            Relative self-convergence threshold between successive interaction
+            refinements.
+        atol : float, default=0
+            Absolute self-convergence threshold used together with ``rtol``.
+        subdivisions : iterable of int, default=(1, 2, 4, 8)
+            Candidate subdivision counts for the finite-grid methods.
+        n_values : iterable of int, default=(128, 256, 512, 1024)
+            Candidate FFTLog sequence lengths. The current ``bias`` is held
+            fixed during this search.
+        hstart : float, default=0.05
+            Initial Ogata resolution parameter.
+        hdecrement : float, default=2
+            Factor controlling the Ogata resolution search.
+        maxiter : int, default=15
+            Maximum number of Ogata search iterations for each harmonic pair.
+        apply : bool, default=False
+            If ``True``, apply the selected parameters to this object and
+            recompute the interaction.
+
+        Returns
+        -------
+        ConvergenceResult
+            Internal self-convergence record and selected parameters.
+
+        Raises
+        ------
+        RuntimeError
+            If ``apply=True`` but the search does not produce converged
+            parameters.
+        ImportError
+            If the active method is ``'ogata'`` and the optional ``hankel``
+            dependency is unavailable.
+
+        Notes
+        -----
         FFTLog refines ``n`` at fixed ``bias``. Finite-grid methods refine
-        ``subdivisions``. Ogata delegates the search for ``h`` and ``N`` to
-        :func:`hankel.get_h` for each retained harmonic pair.
+        ``subdivisions``. Ogata searches ``N`` and ``h`` independently for the
+        retained harmonic pairs. This method does not modify the q support of
+        the input :class:`HarmonicTransform` objects. The reported error is an
+        internal refinement diagnostic, not an independent reference error.
         """
         from ._convergence import (
             ConvergenceResult,

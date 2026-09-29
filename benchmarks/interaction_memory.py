@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """Peak-RSS scaling of the public ``Interaction`` constructor."""
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 
-from quartic2d import Interaction
-
 from benchmarks._common import environment_metadata
 from benchmarks.interaction_scaling import FieldView, base_field, deltas, kernel
+from quartic2d import Interaction
 
 MIB = 1024.0**2
 MODES = {
@@ -90,7 +90,8 @@ def sample_one(*, method, n_p, n_d, n_f, n_q, s_q, poll_s):
     def monitor():
         while not stop.is_set():
             try: samples.append(read_rss_bytes(proc.pid))
-            except Exception: break
+            except (OSError, RuntimeError):
+                break
             time.sleep(poll_s)
     thread = threading.Thread(target=monitor, daemon=True); thread.start()
     proc.stdin.write("GO\n"); proc.stdin.flush()
@@ -101,7 +102,8 @@ def sample_one(*, method, n_p, n_d, n_f, n_q, s_q, poll_s):
         proc.kill(); raise RuntimeError(err)
     time.sleep(max(0.01, 4 * poll_s))
     try: samples.append(read_rss_bytes(proc.pid))
-    except Exception: pass
+    except (OSError, RuntimeError):
+        pass
     stop.set(); thread.join()
     proc.stdin.write("EXIT\n"); proc.stdin.flush()
     _, err = proc.communicate(timeout=30)

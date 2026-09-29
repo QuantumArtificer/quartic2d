@@ -1,5 +1,9 @@
-import numpy as np
+from typing import ClassVar
 
+import numpy as np
+from scipy.integrate import simpson
+
+from quartic2d import HarmonicTransform
 from quartic2d._convergence import (
     ConvergenceResult,
     converge_sequence,
@@ -212,10 +216,6 @@ def test_ogata_coupled_convergence_uses_N_and_h_lookahead():
     assert any(step.converged for step in result.steps)
 
 # ---- q-sampling core behavior ----
-import numpy as np
-from scipy.integrate import simpson
-
-from quartic2d import HarmonicTransform
 from quartic2d._sampling import radial_q_ceiling
 
 
@@ -315,9 +315,9 @@ def test_q_support_certification_uses_requested_tail_budget(monkeypatch):
 
     class Decomposition:
         r = np.linspace(0.0, 4.0, 129)
-        m_sorted = [0]
-        cutoff_radius = {0: 4.0}
-        power_fracs = {0: 1.0}
+        m_sorted: ClassVar[list[int]] = [0]
+        cutoff_radius: ClassVar[dict[int, float]] = {0: 4.0}
+        power_fracs: ClassVar[dict[int, float]] = {0: 1.0}
         _rho = np.ones_like(r)
 
         def __getitem__(self, m):

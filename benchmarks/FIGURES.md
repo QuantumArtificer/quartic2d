@@ -1,12 +1,12 @@
 # Manuscript figures and tables
 
-This file defines the final QUARTIC2D manuscript evidence layout. The paper is a **numerical methods/software paper**. Its main figures therefore follow the sequence
+This file defines the QUARTIC2D manuscript evidence layout. The main figures follow the scientific argument
 
-`method -> correctness -> trustworthy error control -> cost at controlled accuracy -> computational scaling/reuse`.
+`four-center reduction -> correctness -> error control -> cost at controlled accuracy -> scaling and reuse`.
 
-The individual quadrature backends are implementations inside that method. Backend comparisons support accuracy, robustness, and performance claims; they are not the organizing subject of the paper. Interfunction separation is denoted by `delta` (\(\delta\)) throughout the manuscript figures and tables.
+The quadrature backends implement the same reduced interaction formula. Their comparisons support accuracy, robustness, and performance claims for specified workload classes; they do not define the scientific scope of the method. Interfunction separation is denoted by `delta` (\(\delta\)) throughout the manuscript figures and tables.
 
-The plotting contract follows conventions used in peer-reviewed numerical-method/software papers, in particular:
+The plotting contract follows conventions used in peer-reviewed computational-physics and numerical-method papers, in particular:
 
 - Hickstein *et al.*, Rev. Sci. Instrum. **90**, 065115 (2019), DOI `10.1063/1.5092635`: direct analytic validation and runtime scaling;
 - Barnett, Magland, and af Klinteberg, SIAM J. Sci. Comput. **41**, C479 (2019), DOI `10.1137/18M120885X`: achieved error versus requested tolerance and runtime versus achieved accuracy;
@@ -17,7 +17,7 @@ The plotting contract follows conventions used in peer-reviewed numerical-method
 
 ## Publication style
 
-All manuscript figures use the same restrained numerical-paper style:
+All manuscript figures use the same restrained computational-physics style:
 
 - double-column width: 7.0 in;
 - approximately 8.5--9 pt text at final size;
@@ -26,12 +26,12 @@ All manuscript figures use the same restrained numerical-paper style:
 - logarithmic axes for errors, runtimes, and scaling variables when appropriate;
 - panel labels `(a)`, `(b)`, ...;
 - method identity kept consistent across figures;
-- every legend is opaque and framed, and is placed only in reserved blank plotting area or an internal legend band so it cannot be mistaken for or obscure measured data;
+- legends are used only when they improve decoding, are placed outside measured structure or in genuinely empty plot regions, and are replaced by direct labels when a sparse figure does not need a legend;
 - peak-normalized absolute residuals rather than pointwise relative errors near zeros;
 - error bars report measured repeat dispersion where available;
-- reference/tolerance guide lines remain visually secondary to measured data;
+- reference and requested-target guide lines remain visually secondary to measured data and are used only when the plotted metric is directly comparable;
 - no points are placed outside the data axes as categorical annotations;
-- vector PDF is the manuscript source; PNG is generated only for review/preview.
+- vector PDF is the manuscript source; raster review/preview exports are generated at 600 dpi.
 
 One scalar cross-method error is
 
@@ -49,7 +49,7 @@ This scalar is used only when a single ordinate is needed. Component errors rema
 
 **Format:** 2 x 2 panels.
 
-- **(a)** representative anisotropic input density `rho(x,y)`;
+- **(a)** representative anisotropic transition field `rho(x,y)`;
 - **(b)** retained angular-harmonic radial profiles `rho_m(r)`;
 - **(c)** corresponding Fourier-Bessel form factors `F_m(q)`, analytic/reference and numerical curves overlaid;
 - **(d)** final screened interaction `V(delta)`, QUARTIC2D and independently integrated direct-`q` reference overlaid.
@@ -75,25 +75,25 @@ The frozen end-to-end anisotropic Rytova-Keldysh benchmark supplies the numerica
 - **(c)** anisotropic strongly screened Rytova-Keldysh interaction;
 - **(d)** nodal 2DEG-RPA interaction.
 
-Residuals are
+Residual curves use
 
-`|numerical - reference| / max|reference|`
+`|numerical - reference| / max|reference|`.
 
-so zeros of the reference do not produce meaningless divergent pointwise relative errors.
+This is a pointwise peak-normalized absolute error. Its maximum equals the peak-normalized reference error, while zeros of the reference do not generate divergent pointwise relative errors. No requested `rtol` line is drawn on these residual panels because `rtol` is an internal self-convergence threshold, not a pointwise bound.
 
 **Generated file:** `main/figure02_direct_accuracy.pdf`.
 
 ## Figure 3 - Automatic error control
 
-**Purpose:** validate the package's automatic numerical certification rather than merely show agreement at hand-selected parameters.
+**Purpose:** evaluate the reliability of automatic self-convergence against independent reference calculations rather than merely show agreement at hand-selected parameters.
 
-**Format:** three panels.
+**Format:** four panels.
 
-- **(a) Requested versus achieved error.** `epsilon_req` on the horizontal axis and independent `epsilon_ref` on the vertical axis, both logarithmic. The diagonal is `epsilon_ref = epsilon_req`. All reference-evaluated automatic certificates from the broad Interaction benchmark are shown; large markers denote per-method medians.
-- **(b) Estimated versus actual error.** The finite-rule Richardson estimate is plotted against the independently measured relative `L2` error for automatically certified Simpson and GL4 calculations. The diagonal denotes exact agreement.
-- **(c) Certification outcomes.** Counts of correct automatic certificates, conservative refusals/misses, selector misses with demonstrated backend capability, tested-box incapability, and false-positive certificates. The zero false-positive count is stated explicitly.
+- **(a) Requested target versus independent reference error.** `epsilon_req` on the horizontal axis and independent `epsilon_ref` on the vertical axis, both logarithmic. The diagonal is `epsilon_ref = epsilon_req`. All automatically accepted runs for which an independent reference is evaluated are shown; large markers denote per-method medians. This comparison uses global aggregate errors and must not be described as a pointwise guarantee or as equality of the selector and reference metrics.
+- **(b) Estimated versus independent error.** The finite-rule Richardson estimate is plotted against the independently measured relative `L2` error for automatically accepted Simpson and GL4 calculations. The diagonal denotes exact numerical agreement between these two distinct quantities.
+- **(c,d) Case-level selector outcomes.** Standard- and large-displacement matrices show the four canonical cases against the four public methods. Symbols distinguish automatic acceptance followed by an independent-reference pass, reference-qualified points demonstrated after automatic refusal, unresolved automatic refusals, and tested search boxes that did not demonstrate a capable point. This replaces aggregate stacked counts so the figure exposes which workload produced each outcome.
 
-This is the principal evidence for safe automatic convergence.
+This is the principal evidence for the reliability and limitations of automatic refinement over the tested domain.
 
 **Generated file:** `main/figure03_automatic_error_control.pdf`.
 
@@ -108,7 +108,7 @@ This is the principal evidence for safe automatic convergence.
 - **(c)** large-`delta` isotropic Coulomb;
 - **(d)** large-`delta` complex dual-gate screening.
 
-Standard-domain panels use the requested-tolerance sweep (`1e-3`, `1e-4`, `1e-5`) and the primary method matrix. Large-`delta` (\(\delta\)) panels use independently reference-qualified fixed configurations at the practical `1e-3` target. A conservative automatic refusal may appear only when an independent oracle/reference has qualified the fixed parameter set; it is not relabeled as an automatic certificate.
+Standard-domain panels use the requested-tolerance sweep (`1e-3`, `1e-4`, `1e-5`) and the primary method matrix. Large-`delta` (\(\delta\)) panels use independently reference-qualified fixed configurations at the practical `1e-3` target. A conservative automatic refusal may appear only when an independent reference has separately qualified the fixed parameter set; the fixed configuration is not relabeled as an automatically selected result.
 
 No aggregate backend winner is reported. Comparisons are conditional on workload and achieved error. A method is plotted only when an independently reference-qualified production timing exists for that workload. Public Ogata is absent from the standard-domain panels because it was not included in the older canonical broad timing sweep. Trapezoid and GL8 are absent from the large-\(\delta\) panels because the practical fixed-configuration timing benchmark was defined for Simpson, GL4, FFTLog, and Ogata. FFTLog is additionally absent from the large-\(\delta\) complex dual-gate panel because no configuration in the declared tested box met the target. These absences must be stated explicitly in the caption/discussion and must not be interpreted as zero runtime or omitted successful data.
 
@@ -148,17 +148,17 @@ This table supports the cumulative `PETAL2D -> HarmonicTransform -> Interaction`
 
 **Generated files:** `tables/table01_end_to_end_accuracy.{tex,csv}`.
 
-## Table 2 - Automatic Interaction certification at the primary target
+## Table 2 - Automatic Interaction convergence at the primary target
 
 For each public method in the standard and large separation domains report:
 
-- automatically certified/reference-passing cases out of four;
-- false-positive certificates;
-- demonstrated selector misses where the bounded capability test found a passing configuration.
+- automatically accepted and independently reference-passing cases out of four;
+- automatically accepted cases that fail the independent reference;
+- demonstrated selector misses where the bounded capability test found a reference-passing configuration.
 
 The table is a reliability/coverage summary at `1e-4`, not a method ranking.
 
-**Generated files:** `tables/table02_automatic_certification.{tex,csv}`.
+**Generated files:** `tables/table02_automatic_convergence_outcomes.{tex,csv}`.
 
 ---
 
@@ -166,24 +166,24 @@ The table is a reliability/coverage summary at `1e-4`, not a method ranking.
 
 ## Figure S1 - HarmonicTransform validation by workload and requested tolerance
 
-Three panels for `1e-3`, `1e-4`, and `1e-5`, showing achieved error for Simpson and GL4 over the non-stress analytic generality suite. Each workload/method result is an independent categorical scatter point; points are not connected because the workload index has no progression semantics. Incomplete stringent-limit cases remain missing rather than being assigned artificial error values.
+Three panels for `1e-3`, `1e-4`, and `1e-5`, showing independently measured global error for Simpson and GL4 over the non-stress analytic generality suite. Each workload/method result is an independent categorical scatter point; points are not connected because the workload index has no progression semantics. Incomplete stringent-limit cases remain missing rather than being assigned artificial error values.
 
 **Generated file:** `supplement/figureS01_harmonic_validation.pdf`.
 
-## Figure S2 - Broad Interaction accuracy by benchmark case
+## Figure S2 - Broad Interaction accuracy distributions
 
-Three categorical scatter panels, one for each requested tolerance, show the achieved `epsilon_ref` for every reference-qualified case in the 74-case fixed-field suite. The horizontal dotted line is the requested tolerance. The horizontal coordinate is only the fixed benchmark-case index; points are **not connected** because the cases have no progression or distribution semantics. Methods with incomplete coverage therefore display fewer points; exact certification counts are reported in Table 2/S2 rather than encoded into the legend.
+Three cumulative panels, one for each requested tolerance, show the fraction of the 74-case fixed-field suite that has an independently reference-qualified result at or below a given `epsilon_ref`. The vertical dotted line is the requested numerical level. Curves that plateau below one expose incomplete qualification in the declared search without inventing values for missing cases. The requested-level guide is compared with the global `epsilon_ref` scalar, not with a pointwise residual.
 
 **Generated file:** `supplement/figureS02_interaction_accuracy_distributions.pdf`.
 
-## Figure S3 - Backend parameter sensitivity
+## Figure S3 - Numerical-method parameter sensitivity
 
 - FFTLog `(N, q_bias)` bounded capability maps for a standard nodal workload and a hostile large-`delta` complex workload;
 - Ogata coupled `h`-`N` refinement paths for the large complex and large nodal cases.
 
-This figure documents non-monotone/specialist parameter behavior. It does not imply that increasing FFTLog `N` or Ogata `N` alone guarantees convergence.
+This figure documents non-monotone specialist-parameter behavior. It does not imply that increasing FFTLog `N` or Ogata `N` alone guarantees convergence or accuracy.
 
-**Generated file:** `supplement/figureS03_backend_parameter_sensitivity.pdf`.
+**Generated file:** `supplement/figureS03_numerical_method_parameter_sensitivity.pdf`.
 
 ## Figure S4 - Cross-stage validation and safe refusal
 

@@ -14,6 +14,7 @@ profiles must certify at the requested tolerance.  Deliberately discontinuous
 slow-tail profiles must refuse q-support certification rather than emit a false
 certificate.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,7 +24,6 @@ from pathlib import Path
 
 import numpy as np
 
-from quartic2d import HarmonicTransform
 from benchmarks._common import environment_metadata
 from benchmarks.harmonic_transform import (
     SyntheticDecomposition,
@@ -31,7 +31,7 @@ from benchmarks.harmonic_transform import (
     signed_exact,
     workloads,
 )
-
+from quartic2d import HarmonicTransform
 
 VALIDATED_NR = {
     "gaussian_isotropic": 160,
@@ -145,7 +145,7 @@ def main() -> None:
                     verbose=False,
                 )
                 elapsed = time.perf_counter() - t0
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- benchmark records unexpected failures
                 rows.append(
                     {
                         "workload": name,
@@ -270,8 +270,8 @@ def main() -> None:
         "n_certified_reference_pass": len(passing_rows),
         "false_positive_certificates": int(false_positives),
         "missed_convergence": int(missed),
-        "stress_refusals_expected": int(len(stress_expected)),
-        "stress_refusals_observed": int(sum(stress_expected)),
+        "stress_refusals_expected": len(stress_expected),
+        "stress_refusals_observed": sum(stress_expected),
         "worst_certified_relative_l2": max(
             (row["external_reference_error"]["relative_l2"] for row in passing_rows),
             default=None,

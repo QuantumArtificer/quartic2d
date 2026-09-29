@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-"""Paper benchmark: Step-2 HarmonicTransform computational scaling."""
+"""Publication benchmark: HarmonicTransform computational scaling."""
+
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 import numpy as np
 from scipy.integrate import simpson
 
-from quartic2d import HarmonicTransform
-
 from benchmarks._common import environment_metadata, timed_call, write_json
+from quartic2d import HarmonicTransform
 
 BATCH_SIZE = 256
 

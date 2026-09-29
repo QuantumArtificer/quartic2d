@@ -1,0 +1,49 @@
+{
+  "generated_outputs_sha256": {
+    "canonical_outcomes.md": "2b5bc348cefde3972b514a786810a4e9824dfb06fcc805c9607351fa813aaca9",
+    "cross_stage.md": "f47c1b83ffb76ac589022bcfdabf983ac44f6c01c4ec1ef34bc5e6fa9a1b4382",
+    "end_to_end.md": "13f0c9bef4c172aade45211d1a83063978b8dca302a515ab7f1bba24da6a3061",
+    "fftlog_coverage.md": "7e61484a102b56889f5975e98f2eff7175d2ec24f81707df7e911bbbe1cf9de7",
+    "harmonic_primary.md": "6582d37221a1533119b61bb94ccc6e9c6ac9099be5c4f17f2bcfdd26b8617bd1",
+    "interaction_primary.md": "4b4ad11b8e67b328bf60205b6d4d5de7bb9fbd0f438d82c4e51aaaaefe7ae30b",
+    "interaction_tolerance_response.md": "95d18e438a1e75688cc533a96478490199547f6e5a7f17614f8feb874820410e",
+    "large_delta_timing.md": "28a859015adadeebe8b2656a9ec7c67ad437853bcc9c823d9a1b1d06664b4759",
+    "reference_stability.md": "0fc5d3940b1bc4e8183a507c1f7c8fa73827e4f43e116c35f7a02fa6cb8d9654",
+    "standard_calibration_cost.md": "fa3fb7d07fc4b337d063a65a89443a3aceaf1432c4884cb137dea9b9714e4187"
+  },
+  "input_sha256": {
+    "harmonic.json": "8455ee705b33c61700d57d9dd8f1f489867b7447a9f37f1d49a74a324fd5e0ff",
+    "interaction_accuracy.json": "4e365060c5689754e9818ebcf0c93b45d28ecdceafb0d56dc5d903808ac8c14b",
+    "interaction_convergence.json": "60016bad5f9f6f3b566d4db84c0a40db5e0443eed24dd583f86db052b34454ce",
+    "manifest.json": "06db2d83f6330b0761dc92bdcaba76fef2ec00d16b9d7cce663ac35a80d62d18",
+    "memory.json": "eb58b9c9fa5e59f19afa3594578a4b530c1d57c4450a6d7ef856e7a96685a8b1",
+    "performance.json": "6ab2593e545f31c023fa3a0fa888e02663cabc7580ac7170eccb42a4e9d4d54d",
+    "pipeline.json": "cb787bf7eb968132b096b2e07c194c3ca64eefe14f083a8849c2604a176f80c0",
+    "scaling.json": "88150e21118243f5f00dc61b38abf4b8491a36e77603399588d591928301bce3"
+  },
+  "publication_bundle_sha256": "66e7a9ff7973cf45ac593cf7f5e25a7e432c446f5ef6048b10d0a6a7ce89aca0",
+  "schema_version": 1,
+  "source_manifest": {
+    "profile": "publication",
+    "provenance_assessment": {
+      "benchmark_execution_allowed": true,
+      "reproducibility": "working_tree_dependent",
+      "source_state": "working_tree_modified"
+    },
+    "repository": {
+      "branch": "main",
+      "changed_paths": [
+        {
+          "path": "benchmarks_publication_run.log",
+          "status": " M"
+        }
+      ],
+      "commit": "6bcdac3ee02bc8687d341c05049a3d024a2bf4b5",
+      "diff_sha256": "9d29d5f77f384a484965b28455da4a5f9cd2ae56294991e72a86f5b73447a6e7",
+      "dirty": true,
+      "reproducibility": "working_tree_dependent",
+      "source_state": "working_tree_modified"
+    },
+    "status": "passed"
+  }
+}

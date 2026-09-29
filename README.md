@@ -4,29 +4,38 @@
 [![Documentation](https://github.com/QuantumArtificer/quartic2d/actions/workflows/docs.yml/badge.svg)](https://quantumartificer.github.io/quartic2d/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-QUARTIC2D is a Python package for evaluating interaction matrix elements between localized two-dimensional fields with radially symmetric interaction kernels. It is built on top of [PETAL2D](https://github.com/QuantumArtificer/petal2d): PETAL2D supplies the angular-harmonic decomposition of the fields, while QUARTIC2D evaluates the radial Hankel transforms and harmonic-resolved interaction integrals.
-
-For a PETAL2D decomposition
+QUARTIC2D evaluates four-center interaction matrix elements for localized two-dimensional states. For orbitals $\phi_1,\ldots,\phi_4$ and a translationally invariant radial interaction,
 
 $$
-\rho(r,\theta)=\sum_m \rho_m(r)e^{im\theta},
+U_{1234}=\iint d^2\mathbf r\,d^2\mathbf r'\,
+\phi_1^*(\mathbf r)\phi_2^*(\mathbf r')
+U(|\mathbf r-\mathbf r'|)
+\phi_3(\mathbf r)\phi_4(\mathbf r').
 $$
 
-QUARTIC2D computes
+The four orbital indices enter through the transition fields
 
 $$
-F_m(q)=\int_0^\infty r\,\rho_m(r)J_m(qr)\,dr
+\rho_{13}=\phi_1^*\phi_3,
+\qquad
+\rho_{42}=\phi_4^*\phi_2.
 $$
 
-and combines the transformed harmonics to evaluate displaced interactions for radially symmetric momentum-space kernels $U(q)$.
+These fields may be real or complex. The same formulation therefore applies to direct density-density terms, exchange, pair hopping, correlated hopping, and other four-index channels. The current spatial method assumes a scalar radial kernel $U(q)$.
+
+QUARTIC2D expands each transition field in circular harmonics, Hankel-transforms the radial coefficients, and evaluates the remaining one-dimensional momentum integrals for the requested relative displacements. The angular structure of anisotropic and complex orbital products remains explicit throughout the calculation.
+
+Documentation: [quantumartificer.github.io/quartic2d](https://quantumartificer.github.io/quartic2d/)
 
 ## Installation
+
+Install the released package from PyPI:
 
 ```bash
 python -m pip install quartic2d
 ```
 
-Ogata quadrature is a supported optional backend. Install its dependency with
+The optional Ogata backend is installed with
 
 ```bash
 python -m pip install "quartic2d[ogata]"
@@ -37,145 +46,177 @@ For development:
 ```bash
 git clone https://github.com/QuantumArtificer/quartic2d.git
 cd quartic2d
-python -m pip install -e ".[test,docs,release,ogata]"
+python -m pip install -e ".[test,docs,dev,release,ogata]"
 ```
 
-QUARTIC2D supports Python 3.10--3.13 and depends on NumPy, SciPy, Matplotlib, and PETAL2D. The public Ogata backend uses the optional `hankel` dependency installed by the `ogata` extra.
+QUARTIC2D supports Python 3.10--3.13.
 
-## Basic usage
+## Quick start
+
+The example below evaluates a direct term and an exchange term for localized $s$ and $p_x$ orbitals.
 
 ```python
 import numpy as np
 from petal2d import PolarDecomposition
 from quartic2d import HarmonicTransform, Interaction
 
-x = np.linspace(-6.0, 6.0, 161)
-y = np.linspace(-6.0, 6.0, 161)
+x = np.linspace(-6.0, 6.0, 181)
+y = np.linspace(-6.0, 6.0, 181)
 
 
-def density(x, y):
-    return np.exp(-(x**2 + y**2)) / np.pi
+def orbital_s(x, y):
+    return np.exp(-0.5 * (x**2 + y**2)) / np.sqrt(np.pi)
 
 
-dec = PolarDecomposition(density, x, y, Nr=161, Ntheta=256)
-
-# Normal Step 2: one transform pass with benchmarked defaults.
-transformed = HarmonicTransform(dec)
+def orbital_px(x, y):
+    return np.sqrt(2.0 / np.pi) * x * np.exp(-0.5 * (x**2 + y**2))
 
 
-def U_q(q):
-    kappa = 0.25
-    return 2.0 * np.pi / np.sqrt(q**2 + kappa**2)
+def transform(field):
+    dec = PolarDecomposition(
+        field,
+        x,
+        y,
+        Nr=181,
+        Ntheta=256,
+        rmax=5.5,
+        origin=(0.0, 0.0),
+    )
+    return HarmonicTransform(dec)
 
+
+def rho_ss(x, y):
+    psi = orbital_s(x, y)
+    return np.conj(psi) * psi
+
+
+def rho_pp(x, y):
+    psi = orbital_px(x, y)
+    return np.conj(psi) * psi
+
+
+def rho_sp(x, y):
+    return np.conj(orbital_s(x, y)) * orbital_px(x, y)
+
+
+def yukawa(q):
+    return 2.0 * np.pi / np.sqrt(q**2 + 0.35**2)
+
+
+field_ss = transform(rho_ss)
+field_pp = transform(rho_pp)
+field_sp = transform(rho_sp)
 
 deltas = np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
-interaction = Interaction(deltas, transformed, transformed, U_q)
-print(interaction.V)
+
+direct = Interaction(deltas, field_ss, field_pp, yukawa)
+exchange = Interaction(deltas, field_sp, field_sp, yukawa)
+
+for delta, ud, ux in zip(deltas, direct.V, exchange.V):
+    print(
+        f"delta={delta}: "
+        f"direct={ud.real:.8f}, exchange={ux.real:.8f}"
+    )
 ```
 
-The normal `HarmonicTransform(dec)` path does **not** run a convergence study. It chooses a scale-aware momentum range and q grid, evaluates the transform once, and then performs inexpensive checks on the arrays it already computed. If those checks see signs of inadequate q support or sampling, QUARTIC2D emits one concise warning explaining the quantity that triggered it and recommends the explicit convergence helper.
+```text
+delta=[0. 0.]: direct=0.66779880, exchange=0.29977663
+delta=[1. 0.]: direct=0.66467833, exchange=0.05339600
+delta=[2. 0.]: direct=0.45138002, exchange=-0.11276283
+```
 
-For unusual inputs, or when you want to trade accuracy against runtime or memory, calibrate once and reuse the result:
+![Direct and exchange four-center interactions](docs/source/_static/examples/direct_exchange.svg)
+
+The complete calculation is in [`examples/four_center_interaction.py`](examples/four_center_interaction.py). The [Getting started](https://quantumartificer.github.io/quartic2d/getting_started.html) page explains the transition fields, kernel convention, displacement vectors, and returned arrays.
+
+## What can be calculated
+
+A four-center orbital integral is specified by the two transition fields. Common choices include:
+
+| Term | Matrix element | Transition fields |
+| --- | --- | --- |
+| direct interaction | $U_{ijij}$ | $|\phi_i|^2$ and $|\phi_j|^2$ |
+| exchange | $U_{ijji}$ | $\phi_i^*\phi_j$ and $\phi_i^*\phi_j$ |
+| pair hopping | $U_{iijj}$ | $\phi_i^*\phi_j$ and $\phi_j^*\phi_i$ |
+| correlated hopping | e.g. $U_{iiij}$ | $|\phi_i|^2$ and $\phi_j^*\phi_i$ |
+
+The mathematical formulation does not require the fields to be densities or real functions. Benchmark coverage is described separately in the validation documentation.
+
+## Numerical control
+
+The ordinary constructors provide practical default resolutions together with numerical diagnostics:
 
 ```python
-calibration = HarmonicTransform.converge_parameters(
-    dec,
+field = HarmonicTransform(decomposition)
+interaction = Interaction(deltas, field1, field2, U_q)
+```
+
+When a reported result needs an explicit self-convergence criterion, determine the momentum representation and interaction resolution with the convergence interfaces:
+
+```python
+hcal = HarmonicTransform.converge_parameters(
+    decomposition,
     rtol=1e-4,
     q_tail_rtol=1e-3,
 )
-transformed = calibration.transform(dec)
+field = hcal.transform(decomposition)
+
+ical = Interaction.converge_parameters(
+    deltas,
+    field1,
+    field2,
+    U_q,
+    rtol=1e-4,
+)
 ```
 
-Here `rtol` controls numerical discretization on the represented q interval, while `q_tail_rtol` controls how much transformed L2 norm may remain beyond the selected `q_max`. The convergence call is intentionally more expensive than normal production use.
+The [User guide](https://quantumartificer.github.io/quartic2d/user_guide/) develops the physical inputs first, then q support, interpolation, quadrature, convergence records, and method selection. The [Validation and benchmarks](https://quantumartificer.github.io/quartic2d/validation/) section reports the independent accuracy and performance evidence used to assess those numerical choices.
 
-## Numerical backends
+## Documentation
 
-QUARTIC2D keeps the numerical backend explicit and user-selectable.
+- [Getting started](https://quantumartificer.github.io/quartic2d/getting_started.html)
+- [User guide](https://quantumartificer.github.io/quartic2d/user_guide/)
+- [API reference](https://quantumartificer.github.io/quartic2d/reference/)
+- [Guided examples](https://quantumartificer.github.io/quartic2d/examples/)
+- [Theory](https://quantumartificer.github.io/quartic2d/theory/)
+- [Validation and benchmarks](https://quantumartificer.github.io/quartic2d/validation/)
+- [Limitations](https://quantumartificer.github.io/quartic2d/limitations.html)
+- [Development](https://quantumartificer.github.io/quartic2d/development/)
 
-For the sampled radial transform $\rho_m(r)\rightarrow F_m(q)$, available quadratures are:
+The public top-level API is intentionally small: `HankelTransform`, `HarmonicTransform`, and `Interaction`.
 
-- Simpson (default)
-- composite 4-point Gauss--Legendre (`gl4`)
-- composite 8-point Gauss--Legendre (`gl8`)
-- trapezoidal
-- Ogata quadrature through the `hankel` package
-
-For the interaction transform, available backends are:
-
-- `gl4` (default)
-- FFTLog (`n=512`, `bias=-0.5`)
-- `gl8`
-- Simpson
-- trapezoidal
-- Ogata
-
-The full benchmark suite compares accuracy, convergence, and runtime across smooth, higher-order, nodal, algebraic, oscillatory, and discontinuous reference problems. In the release benchmark, Simpson and GL4 both give high-quality sampled radial transforms; Simpson reaches comparable accuracy at lower cost for the tested sampled PETAL2D-like profiles, while GL4/GL8 remain useful finite-quadrature verification backends. GL4 is the robust general-purpose interaction default. FFTLog provides a high-throughput option for compatible qualified workloads, while public Ogata quadrature provides a complementary oscillatory specialist whose `N` and `h` parameters can be calibrated explicitly.
-
-The defaults are intended for normal use. Use `HarmonicTransform.converge_parameters(...)` when a fast diagnostic warns, when you need a documented numerical tolerance, or when you want to reduce runtime or memory for a repeated production workload. For radial Ogata transforms, `HankelTransform.converge(...)` / `HarmonicTransform.converge(...)` calibrate `N` and `h` on an already chosen q grid; the full q-support `HarmonicTransform.converge_parameters(...)` path currently calibrates the finite-grid radial backends.
-
-## Examples
-
-Executable examples are provided in [`examples/`](examples/):
-
-- [`hankel_gaussian.py`](examples/hankel_gaussian.py) -- analytic single-mode Hankel transform.
-- [`petal2d_harmonics.py`](examples/petal2d_harmonics.py) -- PETAL2D decomposition followed by harmonic transforms.
-- [`gaussian_interaction.py`](examples/gaussian_interaction.py) -- complete PETAL2D -> QUARTIC2D interaction workflow.
-- [`anisotropic_interaction.py`](examples/anisotropic_interaction.py) -- angular dependence and harmonic-resolved contributions.
-- [`quadrature_backends.py`](examples/quadrature_backends.py) -- available numerical backends.
-- [`convergence.py`](examples/convergence.py) -- opt-in Step-2 calibration and reuse of verified parameters.
-
-Run an example from the repository root, for example:
-
-```bash
-python examples/gaussian_interaction.py
-```
-
-## Validation and benchmarks
+## Validation and tests
 
 Run the unit tests with
 
 ```bash
-python -m pytest -q
+python -m pytest
 ```
 
-Run the lightweight analytic documentation check with
+Run the lightweight analytic validation with
 
 ```bash
 python -m benchmarks.gaussian_validation --quick
 ```
 
-The complete benchmark organization and manuscript evidence policy live in [`benchmarks/`](benchmarks/README.md). List the canonical manuscript-grade suite with
+List the full publication benchmark suite with
 
 ```bash
 python -m benchmarks.run_suite publication --list
 ```
 
-A full publication run writes a clean consolidated evidence set under `benchmarks/results/`: one manifest plus seven evidence JSON files: harmonic validation; Interaction accuracy; Interaction automatic convergence; pipeline validation; performance/reuse; runtime scaling; and memory scaling. Generated results are not tracked. Frozen benchmark datasets are published with release/Zenodo artifacts rather than retained in the source tree.
-
-## Documentation
-
-Documentation is published at [quantumartificer.github.io/quartic2d](https://quantumartificer.github.io/quartic2d/).
-
-Build it locally with
-
-```bash
-python -m sphinx -W --keep-going -b html docs/source docs/_build/html
-```
-
-## Public API
-
-The main public classes are:
-
-- `quartic2d.HankelTransform` -- low-level transform of one sampled radial profile.
-- `quartic2d.HarmonicTransform` -- Step-2 transform of all retained PETAL2D harmonics.
-- `quartic2d.Interaction` -- Step-3 interaction calculation.
-
-See the [API reference](https://quantumartificer.github.io/quartic2d/reference/) for full parameter documentation.
+The canonical suite covers analytic transform checks, a fixed-field interaction matrix, automatic refinement over standard and large displacement domains, PETAL2D-to-interaction tests, production timing, runtime scaling, and peak memory. Publication result manifests record the Git source state and numerical environment.
 
 ## Citation
 
-Citation metadata are provided in [`CITATION.cff`](CITATION.cff). A versioned DOI will be added after the first archived Zenodo release.
+Citation metadata are provided in [`CITATION.cff`](CITATION.cff). A version DOI will be added after the first archived Zenodo release.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) and the [development documentation](https://quantumartificer.github.io/quartic2d/development/).
 
 ## License
 
-QUARTIC2D is distributed under the MIT License. See [`LICENSE`](LICENSE).
+QUARTIC2D is distributed under the [MIT License](LICENSE).
+
+Alex Santacruz, 2DQMAT Research @ IF-UNAM

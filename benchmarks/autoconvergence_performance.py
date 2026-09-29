@@ -11,6 +11,7 @@ hot spots.
 The highest tested resolution is a performance baseline only.  Its numerical
 sufficiency must be established by a separate reference/validation benchmark.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -19,12 +20,11 @@ import json
 import pstats
 import statistics
 import time
+from collections.abc import Callable, Iterable
+from functools import partial
 from pathlib import Path
-from typing import Callable, Iterable
 
 import numpy as np
-
-from quartic2d import HarmonicTransform, Interaction
 
 from benchmarks._common import environment_metadata
 from benchmarks._interaction_suite import (
@@ -40,6 +40,7 @@ from benchmarks._interaction_suite import (
     validation_cases,
 )
 from benchmarks.harmonic_transform import SyntheticDecomposition, workloads
+from quartic2d import HarmonicTransform, Interaction
 
 SUPPORTED_HARMONIC_METHODS = ("trapezoid", "simpson", "gl4", "gl8")
 SUPPORTED_INTERACTION_METHODS = FINITE_METHODS + ("fftlog", "ogata")
@@ -323,17 +324,17 @@ def run_harmonic(
                     flush=True,
                 )
 
-                def calibrate():
-                    return HarmonicTransform.converge_parameters(
-                        decomposition,
-                        rtol=tolerance,
-                        atol=1.0e-12,
-                        q_tail_rtol=q_tail_rtol,
-                        method=method,
-                        interpolator="cubic",
-                        subdivisions=HARMONIC_SUBDIVISIONS,
-                        verbose=False,
-                    )
+                calibrate = partial(
+                    HarmonicTransform.converge_parameters,
+                    decomposition,
+                    rtol=tolerance,
+                    atol=1.0e-12,
+                    q_tail_rtol=q_tail_rtol,
+                    method=method,
+                    interpolator="cubic",
+                    subdivisions=HARMONIC_SUBDIVISIONS,
+                    verbose=False,
+                )
 
                 try:
                     calibration, convergence = time_callable(
@@ -341,7 +342,7 @@ def run_harmonic(
                         warmups=calibration_warmups,
                         repeats=calibration_repeats,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 -- benchmark records failed configurations
                     rows.append(
                         {
                             "stage": "HarmonicTransform",
@@ -356,7 +357,7 @@ def run_harmonic(
 
                 parameters = convergence.parameters
                 production, _ = time_callable(
-                    lambda: convergence.transform(decomposition, check=False),
+                    partial(convergence.transform, decomposition, check=False),
                     warmups=production_warmups,
                     repeats=production_repeats,
                 )
@@ -370,14 +371,15 @@ def run_harmonic(
                 if "q_grid" in parameters:
                     fixed["q_grid"] = parameters["q_grid"]
                 floor, _ = time_callable(
-                    lambda: HarmonicTransform(decomposition, subdivisions=1, **fixed),
+                    partial(HarmonicTransform, decomposition, subdivisions=1, **fixed),
                     warmups=production_warmups,
                     repeats=production_repeats,
                 )
                 upper, _ = time_callable(
-                    lambda: HarmonicTransform(
+                    partial(
+                        HarmonicTransform,
                         decomposition,
-                        subdivisions=int(HARMONIC_SUBDIVISIONS[-1]),
+                        subdivisions=HARMONIC_SUBDIVISIONS[-1],
                         **fixed,
                     ),
                     warmups=production_warmups,
@@ -429,8 +431,8 @@ def run_harmonic(
                             upper,
                         ),
                         "search_work": {
-                            "quadrature_evaluations": int(len(convergence.quadrature.steps)),
-                            "q_interpolation_levels": int(len(convergence.sampling.interpolation_steps)),
+                            "quadrature_evaluations": len(convergence.quadrature.steps),
+                            "q_interpolation_levels": len(convergence.sampling.interpolation_steps),
                             "recorded_quadrature_seconds": quadrature_seconds,
                             "calibration_minus_recorded_quadrature_seconds": (
                                 None if t_cal is None else float(max(0.0, t_cal - quadrature_seconds))
@@ -499,23 +501,23 @@ def run_interaction(
                         else FFTLOG_BIAS_VALUES_LARGE
                     )
 
-                    def calibrate():
-                        return cls.converge_parameters(
-                            deltas,
-                            field,
-                            field,
-                            kernel.U,
-                            rtol=tolerance,
-                            atol=1.0e-12,
-                            method=method,
-                            interpolator="cubic",
-                            subdivisions=finite_ladder,
-                            n_values=DEFAULT_N_VALUES,
-                            bias=fftlog_bias,
-                            bias_values=fftlog_bias_values,
-                            ogata_n_values=DEFAULT_OGATA_N_VALUES,
-                            verbose=False,
-                        )
+                    calibrate = partial(
+                        cls.converge_parameters,
+                        deltas,
+                        field,
+                        field,
+                        kernel.U,
+                        rtol=tolerance,
+                        atol=1.0e-12,
+                        method=method,
+                        interpolator="cubic",
+                        subdivisions=finite_ladder,
+                        n_values=DEFAULT_N_VALUES,
+                        bias=fftlog_bias,
+                        bias_values=fftlog_bias_values,
+                        ogata_n_values=DEFAULT_OGATA_N_VALUES,
+                        verbose=False,
+                    )
 
                     try:
                         calibration, convergence = time_callable(
@@ -523,7 +525,7 @@ def run_interaction(
                             warmups=calibration_warmups,
                             repeats=calibration_repeats,
                         )
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001 -- benchmark records failed configurations
                         rows.append(
                             {
                                 "stage": "Interaction",
@@ -549,7 +551,8 @@ def run_interaction(
                     production = None
                     if convergence.converged:
                         production, _ = time_callable(
-                            lambda: convergence.interaction(
+                            partial(
+                                convergence.interaction,
                                 deltas,
                                 field,
                                 field,
@@ -561,7 +564,7 @@ def run_interaction(
 
                     floor_parameters = interaction_parameters(method, level="floor", delta_domain=delta_domain)
                     floor, _ = time_callable(
-                        lambda: cls(deltas, field, field, kernel.U, **floor_parameters),
+                        partial(cls, deltas, field, field, kernel.U, **floor_parameters),
                         warmups=production_warmups,
                         repeats=production_repeats,
                     )
@@ -570,7 +573,7 @@ def run_interaction(
                     upper_parameters = interaction_parameters(method, level="upper", delta_domain=delta_domain)
                     if upper_parameters:
                         upper, _ = time_callable(
-                            lambda: cls(deltas, field, field, kernel.U, **upper_parameters),
+                            partial(cls, deltas, field, field, kernel.U, **upper_parameters),
                             warmups=production_warmups,
                             repeats=production_repeats,
                         )

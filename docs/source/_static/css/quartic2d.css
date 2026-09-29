@@ -1,0 +1,71 @@
+/* QUARTIC2D documentation figure rhythm.
+   Plot-internal styling lives in quartic2d._plot_style. */
+
+figure.q2d-figure {
+  margin-block: 1.4rem 1.8rem;
+  margin-inline: auto;
+}
+
+figure.q2d-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+
+figure.q2d-figure-compact {
+  max-width: 44rem;
+}
+
+figure.q2d-figure-standard {
+  max-width: 54rem;
+}
+
+figure.q2d-figure-wide {
+  max-width: 66rem;
+}
+
+figure.q2d-figure figcaption {
+  max-width: 58rem;
+  margin-inline: auto;
+}
+
+@media (max-width: 720px) {
+  figure.q2d-figure-compact,
+  figure.q2d-figure-standard,
+  figure.q2d-figure-wide {
+    max-width: 100%;
+  }
+}
+
+/* Keep wide scientific content usable on narrow viewports without shrinking
+   equations, tables, or code to illegible sizes. */
+.bd-article .pst-scrollable-table-container {
+  width: fit-content;
+  max-width: 100%;
+  margin: 1rem auto 1.4rem;
+  overflow-x: auto;
+  background: transparent;
+}
+
+.bd-article .pst-scrollable-table-container > table.table {
+  display: table;
+  width: auto !important;
+  max-width: none;
+  margin: 0;
+}
+
+.bd-article .pst-scrollable-table-container th,
+.bd-article .pst-scrollable-table-container td {
+  vertical-align: top;
+}
+
+.bd-article .math.display,
+.bd-article div.highlight {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.bd-article pre {
+  white-space: pre;
+}

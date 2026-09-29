@@ -13,18 +13,18 @@ PETAL2D + QUARTIC2D workflow while retaining stage-resolved diagnostics so that
 upstream decomposition error is not silently attributed to downstream
 quadrature.
 """
+
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 from petal2d import PolarDecomposition
 
-from quartic2d import HarmonicTransform, Interaction
 from benchmarks._common import environment_metadata
 from benchmarks._interaction_suite import (
     DEFAULT_SUBDIVISIONS,
@@ -38,7 +38,7 @@ from benchmarks._interaction_suite import (
     relative_peak,
     stable_reference_pair,
 )
-
+from quartic2d import HarmonicTransform, Interaction
 
 ArrayFn = Callable[[np.ndarray], np.ndarray]
 DensityFn = Callable[[np.ndarray, np.ndarray], np.ndarray]

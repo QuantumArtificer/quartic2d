@@ -1,160 +1,162 @@
 # Computational complexity
 
-This file records the source-level complexity model used for the manuscript.
-Step 2 is complete here. Step 3 is intentionally deferred until its interaction
-benchmark is constructed from the validated Step-2 outputs.
+This note records the source-derived runtime and memory models used by the scaling benchmarks and manuscript. The asymptotic expressions describe the implemented numerical kernels. Fitted benchmark slopes are finite-range measurements and are reported separately from these source-derived expectations.
 
-## Step 2: `HarmonicTransform`
-
-Notation:
-
-- `N_m`: retained angular harmonics;
-- `N_r`: radial samples in the supplied profile;
-- `s_r`: finite-quadrature subdivision factor;
-- `N_s = s_r (N_r - 1) + 1`: effective radial integration nodes for
-  Simpson/trapezoid;
-- `N_q`: tabulated momentum samples;
-- `B`: internal q-batch size, currently 256;
-- `B_eff = min(B, N_q)`.
-
-For each harmonic, Simpson/trapezoid forms Bessel-function blocks with
-`B_eff x N_s` entries and integrates all `N_q` rows. Treating one fixed-order
-Bessel evaluation as constant cost per matrix element gives
-
-`Theta(N_q N_s)`
-
-per retained harmonic and therefore
-
-`T_H = Theta(N_m N_q N_s)`
-
-for the dominant transform kernel. Because
-
-`N_s = s_r (N_r - 1) + 1 = Theta(s_r N_r)`,
-
-this is equivalently
-
-`T_H = Theta(N_m N_q s_r N_r)`.
-
-The public constructor also performs scale-aware default-grid metadata even
-when explicit q parameters are supplied, builds interpolation objects, and
-computes inexpensive post-transform diagnostics. Their leading work is
-
-`Theta(N_m N_r + N_m N_q)`.
-
-Hence the full constructor has
-
-`T_H,full = Theta(N_m [N_r + N_q + N_q N_s])`,
-
-which reduces to the transform-kernel expression in the nontrivial asymptotic
-regime.
-
-For composite Gauss-Legendre order `p`, the sampled quadrature has
-approximately `p s_r (N_r - 1)` nodes. Thus
-
-`T_H,GLp = Theta(p N_m N_q s_r N_r)`.
-
-Because `p` is fixed (`p=4` or `8`), GL4 and GL8 have the same Big-Theta class
-as Simpson/trapezoid but larger method-dependent prefactors.
-
-### Step-2 memory
-
-The transform processes harmonics sequentially. Previously computed outputs
-remain stored, while the dominant temporary Bessel block contains
-`B_eff N_s` elements. Excluding the input decomposition, the leading storage is
-
-`M_H = Theta(N_m N_q + B_eff N_s + N_r)`.
-
-The first term is persistent transformed output, the second is the batched
-Bessel/integrand workspace, and the last covers radial/interpolation arrays.
-The batch therefore prevents the temporary matrix from scaling as
-`N_q N_s` once `N_q > B`.
-
-### Assumption on angular order
-
-The dimensional analysis treats a Bessel evaluation as `O(1)` for fixed order.
-The empirical `N_m` sweep necessarily includes progressively larger `|m|`, so
-small changes in the measured prefactor with harmonic order are expected; the
-predicted dependence on the number of retained harmonics remains linear.
-
-## Step-2 empirical verification
-
-`run_step2_scaling.py` varies one independent dimension at a time while holding
-all others fixed:
-
-- `N_q`;
-- `N_r`;
-- `N_m`;
-- `s_r`.
-
-The `N_r` and `s_r` fits use the exact effective-node count `N_s`. Each sweep
-stores the asymptotic log-log exponent `alpha` and `R^2` over the largest
-points, as well as an all-point fit to expose finite-size overhead.
-
-A second test collapses the `N_q`, `N_r`, and `s_r` sweeps (fixed harmonic set) against the source-derived work variable
-
-`W = N_m N_q N_s`.
-
-The `N_m` sweep is kept separate because increasing the harmonic count also
-increases the Bessel orders and can change the special-function prefactor. If
-the dominant dimensional model is correct, the fixed-order-set collapse should approach
-
-`t proportional to W`
-
-with log-log slope `alpha -> 1`.
-
-The benchmark times the complete public `HarmonicTransform` constructor.
-`check=False` suppresses warning emission but does not bypass the constructor's
-cheap diagnostic calculation, so the reported wall time is an end-to-end Step-2
-production cost rather than an isolated Bessel-kernel microbenchmark.
-
-## Step 3
-
-
-## Interaction transform
+## HarmonicTransform
 
 Let
 
-- \(N_p=N_m^{(1)}N_m^{(2)}\) be the number of harmonic pairs,
-- \(N_D\) the number of requested displacement vectors,
-- \(N_F\) the FFTLog sequence length,
-- \(N_q\) the native common momentum-grid size, and
-- \(N_{q,s}=s_q(N_q-1)+1\) the refined finite-quadrature grid size.
+- $N_m$ be the number of retained angular harmonics;
+- $N_r$ the number of radial samples supplied by the decomposition;
+- $s_r$ the radial subdivision factor used by a sampled finite quadrature;
+- $N_s=s_r(N_r-1)+1$ the effective sampled radial-grid size for Simpson and trapezoid;
+- $N_q$ the number of momentum samples;
+- $B$ the internal q-batch size, currently 256;
+- $B_{\mathrm{eff}}=\min(B,N_q)$.
 
-For FFTLog, each harmonic pair performs one logarithmic transform and then
-interpolates the result to the requested displacements.  Treating FFT work as
-\(\Theta(N_F\log N_F)\),
+### Sampled finite quadrature
+
+For one harmonic, Simpson and trapezoid evaluate Bessel functions on batches containing $B_{\mathrm{eff}}N_s$ matrix elements and integrate all $N_q$ momentum points. Treating evaluation of a fixed-order Bessel function as constant work per matrix element gives
+
+\[
+T_{H,m}=\Theta(N_qN_s).
+\]
+
+For $N_m$ retained harmonics,
+
+\[
+T_H=\Theta(N_mN_qN_s)
+=\Theta(N_mN_qs_rN_r).
+\]
+
+The constructor also reads the radial profiles, constructs interpolation objects, stores the transformed harmonics, and evaluates diagnostics. Their leading work is
+
+\[
+\Theta(N_mN_r+N_mN_q),
+\]
+
+so a more explicit constructor-level model is
+
+\[
+T_{H,\mathrm{full}}
+=\Theta\!\left[N_m\left(N_r+N_q+N_qN_s\right)\right].
+\]
+
+The $N_qN_s$ term dominates in the nontrivial sampled-quadrature regime.
+
+For a fixed-order composite Gauss-Legendre rule of order $p$, the quadrature uses approximately $p s_r(N_r-1)$ nodes. Therefore
+
+\[
+T_{H,\mathrm{GL}p}
+=\Theta(pN_mN_qs_rN_r).
+\]
+
+Because $p=4$ or $8$ is fixed, GL4 and GL8 have the same asymptotic dependence as Simpson and trapezoid, with method-dependent prefactors.
+
+### Memory
+
+Harmonics are transformed sequentially. Previously computed form factors remain stored, while the dominant temporary sampled-quadrature object is the batched Bessel/integrand block. Excluding storage already owned by the input decomposition,
+
+\[
+M_H
+=\Theta(N_mN_q+B_{\mathrm{eff}}N_s+N_r).
+\]
+
+The first term is the persistent transformed output, the second is the active Bessel/integrand workspace, and the final term represents radial/interpolation arrays. Batching prevents the temporary matrix from growing as $N_qN_s$ once $N_q>B$.
+
+### Angular-order assumption
+
+The dimensional model treats one Bessel evaluation as $O(1)$ at fixed order. The empirical $N_m$ sweep necessarily introduces progressively larger $|m|$, which can change the special-function prefactor. The source-derived prediction is therefore linear in the **number** of retained harmonics at fixed-order cost; deviations caused by the order distribution are a prefactor effect rather than a different array-dimensional scaling law.
+
+## HarmonicTransform scaling benchmark
+
+`harmonic_scaling.py` varies one independent dimension at a time:
+
+- $N_q$;
+- $N_r$;
+- $N_m$;
+- $s_r$.
+
+The $N_r$ and $s_r$ analyses use the exact effective node count $N_s$. Each sweep stores a finite-range log-log fit over the largest measured points and an all-point fit that exposes fixed overhead at small problem sizes.
+
+A separate work-collapse test combines the $N_q$, $N_r$, and $s_r$ sweeps at fixed harmonic content using
+
+\[
+W_H=N_mN_qN_s.
+\]
+
+If the dominant sampled-transform work controls the measured regime, runtime should approach proportionality to $W_H$. The $N_m$ sweep is kept separate because increasing the number of harmonics also changes the represented Bessel orders.
+
+The benchmark times the complete public `HarmonicTransform` constructor. `check=False` suppresses warning emission but does not bypass the ordinary diagnostic calculation, so the measured time is constructor-level production cost rather than an isolated Bessel microbenchmark.
+
+## Interaction
+
+Let
+
+- $N_m^{(1)}$ and $N_m^{(2)}$ be the retained harmonic counts of the two transformed fields;
+- $N_p=N_m^{(1)}N_m^{(2)}$ the number of harmonic pairs;
+- $N_D$ the number of requested displacement vectors;
+- $N_q$ the common native momentum-grid size;
+- $s_q$ the finite-quadrature subdivision factor;
+- $N_{q,s}=s_q(N_q-1)+1$ the refined sampled momentum-grid size;
+- $N_F$ the FFTLog sequence length.
+
+### Finite quadrature
+
+For each harmonic pair, a finite sampled method evaluates a translation-Bessel block over $N_D$ displacements and $N_{q,s}$ momentum nodes. Therefore
+
+\[
+T_{\mathrm{finite}}
+=\Theta(N_pN_DN_{q,s})
+=\Theta(N_pN_Ds_qN_q).
+\]
+
+Pairs are processed sequentially. The leading storage is
+
+\[
+M_{\mathrm{finite}}
+=\Theta(N_pN_D+N_DN_{q,s}+N_q).
+\]
+
+The $N_pN_D$ term stores pair-resolved outputs, while $N_DN_{q,s}$ is the active translation/quadrature workspace. Fixed-order Gauss-Legendre rules preserve the same asymptotic dependence and change the quadrature-node prefactor.
+
+### FFTLog
+
+For each harmonic pair, FFTLog performs one logarithmic transform and evaluates/interpolates the transformed representation at the requested displacements. Treating the transform work as $\Theta(N_F\log N_F)$ gives
 
 \[
 T_{\mathrm{FFTLog}}
 =\Theta\!\left[N_p\left(N_F\log N_F+N_D\right)\right].
 \]
 
-The pair-resolved phase, radial-integral and contribution arrays are all
-\(N_p\times N_D\), while the active FFTLog workspace is independent of
-\(N_p\) because pairs are processed sequentially.  Thus
+The active FFTLog workspace is pair-local, while pair-resolved interaction arrays scale with $N_pN_D$. Thus
 
 \[
 M_{\mathrm{FFTLog}}
-=\Theta\!\left(N_pN_D+N_F+N_q\right),
+=\Theta(N_pN_D+N_F+N_q),
 \]
 
-apart from storage already owned by the input fields.
+apart from storage already owned by the two transformed input fields.
 
-For finite Simpson/trapezoid quadrature, every pair forms a Bessel matrix of
-shape \(N_D\times N_{q,s}\).  Therefore
+## Interaction scaling benchmark
+
+`interaction_scaling.py` measures finite-grid and FFTLog dependence on their independent problem dimensions. The manuscript uses source-derived work variables
 
 \[
-T_{\mathrm{finite}}
-=\Theta\!\left(N_pN_DN_{q,s}\right)
-=\Theta\!\left(N_pN_Ds_qN_q\right),
+W_{\mathrm{finite}}=N_pN_DN_{q,s},
 \]
 
-and, because pairs are processed sequentially,
+and
 
 \[
-M_{\mathrm{finite}}
-=\Theta\!\left(N_pN_D+N_DN_{q,s}+N_q\right).
+W_{\mathrm{FFTLog}}
+=N_p\left[N_F\log_2(N_F)+N_D\right].
 \]
 
-Fixed-order Gauss--Legendre rules preserve these asymptotic classes and change
-only the quadrature-node prefactor.
+The base of the logarithm changes only a constant prefactor. The plotted work guides express the source-derived dimensional models. They are not assertions that every finite benchmark range has reached its asymptotic regime.
+
+## Interpretation of fitted slopes
+
+A measured log-log slope is evidence about the finite range covered by a particular sweep. It should be reported with the swept variable, fixed dimensions, fit range, and goodness of fit. It must not replace the source-derived complexity expression, and a slope close to one in a collapsed work variable should not be generalized beyond the measured regime without additional evidence.
+
+Runtime and memory are benchmarked separately. Neither scaling result establishes numerical accuracy; the configurations used for performance figures must be qualified by the corresponding accuracy/reference benchmarks.

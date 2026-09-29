@@ -8,7 +8,9 @@ recursive-include tools *.py *.sh
 recursive-include examples *.py *.md
 recursive-include benchmarks *.py *.md
 recursive-include tests *.py
-recursive-include docs *.md *.rst *.py Makefile
+include docs/artifacts.json
+recursive-include docs *.md *.rst *.py *.bib *.css *.svg *.png Makefile
+recursive-include docs/source/_generated *.json
 prune benchmarks/results
 prune docs/_build
 global-exclude __pycache__ *.py[cod] .DS_Store

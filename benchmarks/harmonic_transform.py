@@ -10,20 +10,21 @@ separate.
 import argparse
 import json
 import math
-import os
 import statistics
-import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
+from numpy.polynomial.legendre import leggauss
 from scipy.integrate import quad, quad_vec, simpson
 from scipy.interpolate import CubicSpline
 from scipy.optimize import brentq
 from scipy.special import j1, jv, kv
 
+from benchmarks._common import environment_metadata
 from quartic2d import HarmonicTransform
 from quartic2d._numerics import Interpolator1D, composite_gauss_nodes_weights
 
@@ -305,11 +306,6 @@ def workloads() -> list[Workload]:
 # Reference, input-qualification, and convergence helpers
 # -----------------------------------------------------------------------------
 
-from functools import lru_cache
-from numpy.polynomial.legendre import leggauss
-
-from benchmarks._common import environment_metadata
-
 def radial_norm_sq(mode: Mode, upper=np.inf) -> float:
     f = lambda r: r * abs(mode.amplitude * mode.radial(r)) ** 2
     return float(quad(f, 0.0, upper, epsabs=1e-13, epsrel=1e-11, limit=1000)[0])
@@ -404,7 +400,7 @@ def evaluate_sampled_reference(sampled, q):
         order = obj["order"]
         upper = obj["upper"]
         vals, _ = quad_vec(
-            lambda r: r * interp(r) * jv(order, q * r),
+            lambda r, interp=interp, order=order: r * interp(r) * jv(order, q * r),
             0.0,
             upper,
             epsabs=1e-12,
@@ -440,7 +436,7 @@ def _radial_input_metrics(decomp, workload: Workload):
         )
         tail = float(
             quad(
-                lambda r: r * abs(mode.amplitude * mode.radial(r)) ** 2,
+                lambda r, mode=mode: r * abs(mode.amplitude * mode.radial(r)) ** 2,
                 upper,
                 np.inf,
                 epsabs=max(1e-15, exact_total * 1e-13),
@@ -464,7 +460,7 @@ def _radial_input_metrics(decomp, workload: Workload):
     return sampled, rows, float(worst)
 
 
-@lru_cache(maxsize=None)
+@cache
 def _legendre_rule(n: int):
     x, w = leggauss(int(n))
     return np.asarray(x, dtype=float), np.asarray(w, dtype=float)
@@ -725,14 +721,14 @@ def select_subdivisions(
 
 
 def time_constructor(decomp, *, q_max, n_q, method, subdivisions, warmups, repeats):
-    kwargs = dict(
-        q_max=q_max,
-        n_q=n_q,
-        method=method,
-        interpolator="cubic",
-        subdivisions=subdivisions,
-        check=False,
-    )
+    kwargs = {
+        "q_max": q_max,
+        "n_q": n_q,
+        "method": method,
+        "interpolator": "cubic",
+        "subdivisions": subdivisions,
+        "check": False,
+    }
     for _ in range(int(warmups)):
         HarmonicTransform(decomp, **kwargs)
     times = []
@@ -861,7 +857,7 @@ def run(args):
                 q_max, support_bundle, support_modes, support_selection_target = select_analytic_qmax(
                     workload, tail_target
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- preserve reference-failure evidence
                 row["status"] = "analytic_q_support_reference_failed"
                 row["reference_error"] = repr(exc)
                 result["rows"].append(row)

@@ -33,3 +33,9 @@ quartic2d_*diagnostic*.py
 .vscode/
 .idea/
 .DS_Store
+
+# Patch handoff debris
+/quartic2d_patch*.patch
+/q2d_patch*.zip
+/PATCH*_README.txt
+/README.txt

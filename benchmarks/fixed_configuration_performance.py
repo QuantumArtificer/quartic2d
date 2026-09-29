@@ -13,11 +13,13 @@ conservative refusals are included only when their terminal configuration
 itself passed the independent reference.  Rows with no demonstrated
 reference-passing configuration are excluded.
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 import statistics
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -242,16 +244,15 @@ def main() -> None:
             flush=True,
         )
 
-        def evaluate():
-            return interaction_from_parameters(
-                deltas,
-                field,
-                field,
-                kernel,
-                method,
-                fixed_parameters,
-            )
-
+        evaluate = partial(
+            interaction_from_parameters,
+            deltas,
+            field,
+            field,
+            kernel,
+            method,
+            fixed_parameters,
+        )
         value, timing = timed_call(evaluate, warmups=args.warmups, repeats=args.repeats)
         if value is None or not np.all(np.isfinite(value.V)):
             raise RuntimeError(f"non-finite fixed-configuration output for {case.name}/{method}")

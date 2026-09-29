@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -59,6 +58,16 @@ def main():
 
     for pattern in ("*.egg-info", "__pycache__", ".ruff_cache", ".mypy_cache"):
         for path in ROOT.rglob(pattern):
+            remove_untracked_tree(path)
+
+    handoff_patterns = (
+        "quartic2d_patch*.patch",
+        "q2d_patch*.zip",
+        "PATCH*_README.txt",
+        "README.txt",
+    )
+    for pattern in handoff_patterns:
+        for path in ROOT.glob(pattern):
             remove_untracked_tree(path)
 
 

@@ -1,0 +1,16 @@
+Sampled PETAL2D input
+array shape: (181, 181)
+forward: modes=[1], reconstruction error=6.250e-05%, domain consistency=0.99999906
+reverse: modes=[-1], reconstruction error=6.250e-05%, domain consistency=0.99999906
+
+HarmonicTransform
+all self-convergence criteria satisfied: True
+forward analytic relative L2 error: 5.093e-04
+forward peak-normalized max error: 6.477e-04
+
+Interaction
+self-convergence satisfied: True
+delta=0.0  V=+0.000000+0.00e+00j
+delta=1.0  V=-0.074457+1.78e-17j
+delta=2.0  V=-0.089729+2.19e-17j
+delta=4.0  V=-0.010301+2.53e-18j

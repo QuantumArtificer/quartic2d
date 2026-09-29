@@ -1,0 +1,12 @@
+PETAL2D
+rho_ss: modes=[0], reconstruction error=1.343e-14%
+rho_pp: modes=[0, 2, -2], reconstruction error=3.222e-14%
+rho_sp: modes=[1, -1], reconstruction error=2.888e-14%
+
+Automatic convergence
+all harmonic searches satisfied: True
+direct interaction satisfied: True
+exchange interaction satisfied: True
+delta=0.0  direct=+0.667798  exchange=+0.299776
+delta=1.0  direct=+0.664678  exchange=+0.053394
+delta=2.0  direct=+0.451379  exchange=-0.112760

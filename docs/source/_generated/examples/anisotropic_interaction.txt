@@ -1,0 +1,20 @@
+PETAL2D
+retained harmonics: [0, 2, -2]
+m=+0: power fraction=0.970276
+m=+2: power fraction=0.014862
+m=-2: power fraction=0.014862
+PETAL2D target reached: True
+
+HarmonicTransform
+harmonic transform converged: True
+harmonic quadrature: simpson
+retained harmonics: [0, 2, -2]
+F_0(0) = 0.15915476
+
+Interaction
+interaction converged: True
+interaction quadrature: gl4
+delta=0.75: V(0)=0.827885, V(pi/2)=0.756552
+delta=1.50: V(0)=0.557855, V(pi/2)=0.414590
+delta=2.50: V(0)=0.247386, V(pi/2)=0.158939
+harmonic-pair reconstruction relative max residual: 5.971e-16

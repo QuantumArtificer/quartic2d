@@ -1,19 +1,23 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build and verify distributions
+    name: Validate and build distributions
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - name: Checkout release
+      - name: Checkout tagged source
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -21,43 +25,59 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install test and release dependencies
-        run: python -m pip install ".[test,release,ogata]"
+      - name: Install release dependencies
+        run: python -m pip install ".[test,docs,dev,release,ogata]"
 
-      - name: Verify release tag matches package version
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: |
-          python - <<'PY'
-          import os
-          from quartic2d import __version__
-
-          tag = os.environ["RELEASE_TAG"]
-          expected = f"v{__version__}"
-          if tag != expected:
-              raise SystemExit(
-                  f"Release tag {tag!r} does not match package version {expected!r}."
-              )
-          print(f"Release tag matches package version: {tag}")
-          PY
+      - name: Verify release metadata
+        run: python tools/check_release_metadata.py --tag "${GITHUB_REF_NAME}"
 
       - name: Run tests
         run: python -m pytest -q
 
+      - name: Run Ruff
+        run: python -m ruff check src tests examples benchmarks docs/scripts tools
+
+      - name: Run analytic validation
+        run: python -m benchmarks.gaussian_validation --quick --output /tmp/quartic2d-gaussian.json
+
+      - name: Check documentation artifacts
+        run: python docs/scripts/check_artifacts.py
+
+      - name: Build documentation
+        run: python -m sphinx -W --keep-going -b html docs/source docs/_build/html
+
+      - name: Run examples
+        env:
+          MPLBACKEND: Agg
+        run: |
+          for example in examples/*.py; do
+            echo "==> $example"
+            python "$example"
+          done
+
       - name: Build distributions
         run: python -m build
 
-      - name: Check distributions
+      - name: Check distribution metadata
         run: python -m twine check dist/*
 
-      - name: Upload distributions
+      - name: Install built wheel
+        run: python -m pip install --force-reinstall --no-deps dist/*.whl
+
+      - name: Import installed package outside the checkout
+        working-directory: /tmp
+        run: python -c "import quartic2d; print(quartic2d.__version__); print(quartic2d.__all__)"
+
+      - name: Upload verified distributions
         uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
-          path: dist/
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
           if-no-files-found: error
 
-  publish:
+  publish-pypi:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
@@ -68,7 +88,7 @@ jobs:
       id-token: write
 
     steps:
-      - name: Download distributions
+      - name: Download verified distributions
         uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
@@ -76,3 +96,37 @@ jobs:
 
       - name: Publish distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  github-release:
+    name: Publish GitHub release
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download published distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Write checksums
+        run: sha256sum dist/* > SHA256SUMS
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/* SHA256SUMS \
+            --verify-tag \
+            --title "QUARTIC2D ${GITHUB_REF_NAME#v}" \
+            --generate-notes
