@@ -141,10 +141,10 @@ A four-center orbital integral is specified by the two transition fields. Common
 
 | Term | Matrix element | Transition fields |
 | --- | --- | --- |
-| direct interaction | $U_{ijij}$ | $\lvert\phi_{i}\rvert^{2}$ and $\lvert\phi_{j}\rvert^{2}$ |
-| exchange | $U_{ijji}$ | $\phi_{i}^{*}\phi_{j}$ and $\phi_{i}^{*}\phi_{j}$ |
-| pair hopping | $U_{iijj}$ | $\phi_{i}^{*}\phi_{j}$ and $\phi_{j}^{*}\phi_{i}$ |
-| correlated hopping | e.g. $U_{iiij}$ | $\lvert\phi_{i}\rvert^{2}$ and $\phi_{j}^{*}\phi_{i}$ |
+| direct interaction | $`U_{ijij}`$ | $`\lvert\phi_{i}\rvert^{2}`$ and $`\lvert\phi_{j}\rvert^{2}`$ |
+| exchange | $`U_{ijji}`$ | $`\phi_{i}^{*}\phi_{j}`$ and $`\phi_{i}^{*}\phi_{j}`$ |
+| pair hopping | $`U_{iijj}`$ | $`\phi_{i}^{*}\phi_{j}`$ and $`\phi_{j}^{*}\phi_{i}`$ |
+| correlated hopping | e.g. $`U_{iiij}`$ | $`\lvert\phi_{i}\rvert^{2}`$ and $`\phi_{j}^{*}\phi_{i}`$ |
 
 The mathematical formulation does not require the fields to be densities or real functions. Benchmark coverage is described separately in the validation documentation.
 
