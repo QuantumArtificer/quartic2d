@@ -10,20 +10,22 @@ Localized-orbital descriptions of two-dimensional quantum materials often use Wa
 
 For orbitals $\phi_{1},\ldots,\phi_{4}$ and a translationally invariant radial interaction,
 
-$$
-U_{1234}=\iint d^{2}\mathbf{r}\,d^{2}\mathbf{r}'\,
-\phi_{1}^{*}(\mathbf{r})\phi_{2}^{*}(\mathbf{r}')
-U\!\left(\lvert\mathbf{r}-\mathbf{r}'\rvert\right)
-\phi_{3}(\mathbf{r})\phi_{4}(\mathbf{r}').
-$$
+```math
+U_{1234}
+=
+\iint \mathrm{d}^{2}\mathbf{r}\,\mathrm{d}^{2}\mathbf{r}^{\prime}\,
+\phi_{1}^{*}(\mathbf{r})\phi_{2}^{*}(\mathbf{r}^{\prime})
+U\!\left(\left|\mathbf{r}-\mathbf{r}^{\prime}\right|\right)
+\phi_{3}(\mathbf{r})\phi_{4}(\mathbf{r}^{\prime}).
+```
 
 The four orbital indices enter through the transition fields
 
-$$
+```math
 \rho_{13}=\phi_{1}^{*}\phi_{3},
 \qquad
 \rho_{42}=\phi_{4}^{*}\phi_{2}.
-$$
+```
 
 These fields may be real or complex. The same formulation therefore applies to direct density-density terms, exchange, pair hopping, correlated hopping, and other four-index channels. The current spatial method assumes a scalar radial kernel $U(q)$.
 
