@@ -3,6 +3,7 @@ message: "If QUARTIC2D contributes to published research, cite the archived soft
 title: "QUARTIC2D: Quadrature for Radial Tetra-center Interaction Coefficients in 2D"
 type: software
 version: 0.1.0
+date-released: 2026-09-29
 abstract: >-
   QUARTIC2D evaluates four-center interaction matrix elements for generalized
   localized orbital bases in two dimensions with translationally invariant
@@ -14,6 +15,8 @@ abstract: >-
 authors:
   - family-names: "Santacruz"
     given-names: "Alex"
+    affiliation: "Instituto de Física, Universidad Nacional Autónoma de México"
+    orcid: "https://orcid.org/0000-0002-6353-7839"
 keywords:
   - four-center interactions
   - interaction matrix elements

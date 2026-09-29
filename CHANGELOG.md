@@ -2,7 +2,7 @@
 
 All notable changes to QUARTIC2D will be documented in this file.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-09-29
 
 ### Added
 - PETAL2D integration for transforming retained angular harmonics and evaluating radial-kernel interactions.
