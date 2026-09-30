@@ -3,6 +3,7 @@
 [![tests](https://github.com/QuantumArtificer/quartic2d/actions/workflows/tests.yml/badge.svg)](https://github.com/QuantumArtificer/quartic2d/actions/workflows/tests.yml)
 [![Documentation](https://github.com/QuantumArtificer/quartic2d/actions/workflows/docs.yml/badge.svg)](https://quantumartificer.github.io/quartic2d/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/1173858889.svg)](https://doi.org/10.5281/zenodo.23046146)
 
 **QUARTIC2D — Quadrature for Radial Tetra-center Interaction Coefficients in 2D —** evaluates general four-center interaction tensors for localized two-dimensional orbital bases.
 
