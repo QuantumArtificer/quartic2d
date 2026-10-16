@@ -1,12 +1,13 @@
 """Regression: nearly identical independent transform grids are safe at GL refinement."""
 
 import unittest
+
 import numpy as np
 
 from quartic2d._numerics import (
     common_grid,
-    subdivide_grid,
     composite_gauss_nodes_weights,
+    subdivide_grid,
 )
 
 
