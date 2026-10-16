@@ -185,7 +185,10 @@ def subdivide_grid(x: np.ndarray, factor: int) -> np.ndarray:
 
     offsets = np.arange(factor, dtype=float) / factor
     intervals = x[:-1, None] + np.diff(x)[:, None] * offsets[None, :]
-    return np.concatenate((intervals.reshape(-1), x[-1:]))
+    # Independent q grids can contain knots separated by just a few ulps.
+    # Subdivision can round several interior nodes onto the same float;
+    # duplicate nodes are not valid integration panels.
+    return np.unique(np.concatenate((intervals.reshape(-1), x[-1:])))
 
 
 def integrate_function_on_grid(
@@ -457,12 +460,23 @@ def fftlog_hankel_transform(
 
 
 def common_grid(x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
-    """Return the sorted union of two grids on their common finite interval."""
+    """Return a stable union of two grids on their common finite interval.
+
+    Near-identical knots from independently calibrated transforms must be
+    coalesced before nested quadrature refinement: exact ``np.unique`` alone
+    does not remove knots separated by a few units in the last place (ulps).
+    """
     x1 = np.asarray(x1, dtype=float)
     x2 = np.asarray(x2, dtype=float)
     upper = min(float(x1[-1]), float(x2[-1]))
     values = np.concatenate((x1[x1 <= upper], x2[x2 <= upper]))
     grid = np.unique(values)
+    if grid.size >= 2:
+        # Relative to the local q scale, not an arbitrary absolute 1/Angstrom
+        # threshold; the rejected microintervals contribute at roundoff scale.
+        scale = np.maximum(np.abs(grid[1:]), np.abs(grid[:-1]))
+        merge = np.diff(grid) <= (256.0 * np.finfo(float).eps * scale)
+        grid = grid[np.r_[True, ~merge]]
     if grid.size < 2:
         raise ValueError("The two grids do not share a usable integration interval.")
     return grid
