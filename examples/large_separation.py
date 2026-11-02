@@ -1,10 +1,9 @@
 """Long-range Coulomb interaction of a normalized localized Gaussian state."""
 
 import numpy as np
-from petal2d import PolarDecomposition
 from scipy.special import i0e
 
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 
 def density(x, y):

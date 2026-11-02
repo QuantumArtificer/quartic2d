@@ -10,6 +10,12 @@ from scipy.integrate import cumulative_simpson, simpson
 
 from ._convergence import absolute_linf_error, relative_l2_error, relative_linf_error
 from ._numerics import Interpolator1D, _finite_hankel_many, subdivide_grid
+from .reporting import (
+    ConvergenceAction,
+    ConvergenceError,
+    ConvergenceFailureReport,
+    emit_progress,
+)
 
 
 @dataclass
@@ -595,6 +601,7 @@ def estimate_q_support(
     subdivisions: int = 2,
     q_tail_rtol: float = 1.0e-3,
     pilot_oversampling: tuple[float, ...] = (4.0, 8.0, 16.0, 32.0, 64.0),
+    progress=None,
 ) -> tuple[float, float, float, dict[int, QTailModeResult]]:
     """Estimate the smallest q support satisfying a per-harmonic Parseval tail.
 
@@ -736,6 +743,10 @@ def estimate_q_support(
                 )
 
             last_results = mode_results
+            emit_progress(progress, "hankel_q_range", "tested",
+                          parameters={"q_max": float(q_window),
+                                      "pilot_oversampling": oversampling,
+                                      "unresolved_harmonics": sum(not x.resolved for x in mode_results.values())})
             if all_resolved:
                 chosen_oversampling = oversampling
                 q_max = max(float(item.q_required) for item in mode_results.values())
@@ -753,31 +764,38 @@ def estimate_q_support(
             previous_dq = float(q[1] - q[0])
 
         if not need_expand:
-            details = ", ".join(
-                f"m={m}: parseval={last_results[m].parseval_relative_error:.3e}, "
-                f"q_required={last_results[m].q_required}"
-                for m in m_values
-            )
-            raise RuntimeError(
-                "q-support pilot density did not stabilize on the current physical "
-                "support window. Increase pilot_oversampling. " + details
-            )
+            raise ConvergenceError(ConvergenceFailureReport(
+                code="Q_RANGE_PILOT_NOT_STABLE", stage="hankel_q_range",
+                explanation="Refining the momentum sampling still changes the inferred cutoff.",
+                observed={"tested q maximum": q_window, "radial-grid q limit": q_ceiling},
+                requested={"q_tail_rtol": q_tail_rtol},
+                limiting_harmonics=tuple(m for m in m_values if not last_results[m].resolved),
+                actions=(ConvergenceAction("HarmonicTransform.converge_parameters", "tail_pilot_oversampling",
+                           "Test denser momentum sampling to check cutoff stability."),),
+                evidence={"harmonics": {str(m): item.to_dict() for m, item in last_results.items()},
+                          "pilot_oversampling": list(pilot_oversampling)},
+            ))
 
         if q_window >= q_ceiling * (1.0 - 10.0 * np.finfo(float).eps):
             break
         q_window = min(q_ceiling, growth * q_window)
 
     unresolved = [m for m, result in last_results.items() if not result.resolved]
-    details = ", ".join(
-        f"m={m}: parseval={last_results[m].parseval_relative_error:.3e}, "
-        f"q_required={last_results[m].q_required}"
-        for m in unresolved
-    )
-    raise RuntimeError(
-        "Could not satisfy q-space support before the radial-sampling ceiling. "
-        "The PETAL2D radial sampling/support may be insufficient for the requested "
-        f"q_tail_rtol={q_tail_rtol:.3e}. {details}"
-    )
+    raise ConvergenceError(ConvergenceFailureReport(
+        code="Q_RANGE_LIMITED_BY_RADIAL_GRID", stage="hankel_q_range",
+        explanation="The sampled radial grid cannot test whether enough of the transform is included.",
+        observed={"largest tested q": q_window, "radial-grid q limit": q_ceiling,
+                  "largest radial spacing": float(np.max(np.diff(decomposition.r)))},
+        requested={"q_tail_rtol": q_tail_rtol},
+        limiting_harmonics=tuple(unresolved),
+        actions=(
+            ConvergenceAction("PolarDecomposition", "Nr",
+                "Check radial resolution; increase samples if the original input resolves them."),
+            ConvergenceAction("PolarDecomposition", "rmax",
+                "Check real-space extent and whether the input decays near the boundary."),
+        ),
+        evidence={"harmonics": {str(m): item.to_dict() for m, item in last_results.items()}},
+    ))
 
 
 def converge_q_interpolation(
@@ -793,6 +811,7 @@ def converge_q_interpolation(
     adaptive: bool = True,
     adaptive_initial_intervals: int = 16,
     adaptive_maximum_points: int = 4097,
+    progress=None,
 ) -> tuple[np.ndarray, float, list[QInterpolationStep]]:
     """Converge q-grid interpolation by direct off-grid transform checks.
 
@@ -893,13 +912,27 @@ def converge_q_interpolation(
             max_dq=float(np.max(dq)),
         )
         steps.append(step)
+        emit_progress(progress, "hankel_q_interpolation", "tested",
+                      parameters={"n_q": n_q, "oversampling": oversampling,
+                                  "converged": all_ok})
         if all_ok:
             return q, oversampling, steps
 
-    raise RuntimeError(
-        "q-grid interpolation did not converge for all retained harmonics. "
-        "Increase oversampling_values or improve the PETAL2D input sampling."
-    )
+    errors = steps[-1].harmonic_errors if steps else {}
+    tested_modes = tuple(errors)
+    raise ConvergenceError(ConvergenceFailureReport(
+        code="Q_INTERPOLATION_NOT_CONVERGED", stage="hankel_q_interpolation",
+        explanation="Values between saved momentum points still differ from direct Hankel transforms.",
+        observed={"last tested q samples": steps[-1].n_q if steps else None,
+                  "largest relative L2 error": max((v["relative_l2"] for v in errors.values()),
+                                                   default=None)},
+        requested={"rtol": rtol, "atol": atol},
+        limiting_harmonics=tested_modes,
+        actions=(ConvergenceAction("HarmonicTransform.converge_parameters",
+                    "interpolation_oversampling",
+                    "Extend the tested q-grid densities; check the input if it still fails."),),
+        evidence={"refinement_steps": [step.to_dict() for step in steps]},
+    ))
 
 def converge_q_sampling(
     decomposition,
@@ -912,6 +945,7 @@ def converge_q_sampling(
     interpolation_atol: float = 1.0e-12,
     tail_pilot_oversampling: tuple[float, ...] = (4.0, 8.0, 16.0, 32.0, 64.0),
     interpolation_oversampling: tuple[float, ...] = (4.0, 6.0, 8.0, 12.0, 16.0),
+    progress=None,
 ) -> QSamplingResult:
     """Converge the q support and q sampling for all retained harmonics."""
     q_ceiling, q_max, tail_s, tail_modes = estimate_q_support(
@@ -921,6 +955,7 @@ def converge_q_sampling(
         subdivisions=subdivisions,
         q_tail_rtol=q_tail_rtol,
         pilot_oversampling=tail_pilot_oversampling,
+        progress=progress,
     )
     q_grid, interp_s, steps = converge_q_interpolation(
         decomposition,
@@ -931,6 +966,7 @@ def converge_q_sampling(
         rtol=interpolation_rtol,
         atol=interpolation_atol,
         oversampling_values=interpolation_oversampling,
+        progress=progress,
     )
     support_radius = max(
         _mode_support(decomposition, int(m))[2] for m in decomposition.m_sorted

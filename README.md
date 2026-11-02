@@ -64,8 +64,7 @@ The example below evaluates a direct term and an exchange term for localized $s$
 
 ```python
 import numpy as np
-from petal2d import PolarDecomposition
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 x = np.linspace(-6.0, 6.0, 181)
 y = np.linspace(-6.0, 6.0, 181)
@@ -135,6 +134,38 @@ delta=[2. 0.]: direct=0.45138002, exchange=-0.11276283
 ![Direct and exchange four-center interactions](docs/source/_static/examples/direct_exchange.svg)
 
 The complete calculation is in [`examples/four_center_interaction.py`](examples/four_center_interaction.py). The [Getting started](https://quantumartificer.github.io/quartic2d/getting_started.html) page explains the transition fields, kernel convention, displacement vectors, and returned arrays.
+
+## Numerical convergence and reports
+
+`PolarDecomposition` exposes PETAL2D through QUARTIC2D. PETAL2D remains a
+dependency, and its original import path continues to work. The wrapper adds
+`report()` and `to_dict()` for inspecting the input field's harmonic expansion:
+
+```python
+dec = PolarDecomposition(
+    rho_ss, x, y, Nr=181, Ntheta=256, rmax=5.5,
+    origin=(0.0, 0.0),
+)
+print(dec.report())                  # Compact decomposition report
+print(dec.report(level="full"))    # Grid settings and reconstruction evidence
+```
+
+Numerical calibration results support the same compact and full reporting levels:
+
+```python
+hcal = HarmonicTransform.converge_parameters(dec, rtol=1e-4)
+print(hcal.report(level="full"))
+field = hcal.transform(dec)
+
+ical = Interaction.converge_parameters(deltas, field, field, yukawa, rtol=1e-4)
+print(ical.report(level="full"))
+```
+
+Reports record the actual acceptance tests, measured errors, and selected
+parameters. They establish **self-convergence**, not accuracy against an
+unknown exact solution. Failed searches explain the numerical condition and
+identify the API location where relevant parameters can be changed. See the
+[convergence guide](https://quantumartificer.github.io/quartic2d/user_guide/convergence_and_diagnostics.html).
 
 ## What can be calculated
 

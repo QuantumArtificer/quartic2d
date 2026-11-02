@@ -8,6 +8,13 @@ pattern.  Tutorial calculations remain in the :doc:`../getting_started` and
 :doc:`../examples/index` sections.  Physical and numerical boundaries are
 documented separately in :doc:`../limitations`.
 
+Real-space input
+----------------
+
+:doc:`polar_decomposition`
+    Polar-harmonic decomposition of analytic or sampled 2D fields, with
+    compact and detailed reconstruction reports.
+
 Core calculation
 ----------------
 
@@ -30,6 +37,10 @@ Convergence results
     Reusable result returned by
     :meth:`quartic2d.Interaction.converge_parameters`.
 
+:doc:`convergence_reporting`
+    Structured convergence failures, location-specific remedies, and
+    reproducible numerical-method reports.
+
 Advanced numerical primitive
 ----------------------------
 
@@ -42,8 +53,10 @@ Advanced numerical primitive
    :maxdepth: 1
    :hidden:
 
+   polar_decomposition
    harmonic_transform
    interaction
    harmonic_convergence_result
    interaction_convergence_result
+   convergence_reporting
    hankel_transform

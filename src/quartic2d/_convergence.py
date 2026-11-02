@@ -86,6 +86,18 @@ class ConvergenceResult:
         """Whether resolution and any tested conditioning choices are robust."""
         return bool(self.resolution_converged and self.hyperparameter_robust)
 
+    def report(self, *, level: str = "summary") -> str:
+        """Format a low-level refinement record without printing raw dictionaries."""
+        from .reporting import format_lowlevel
+
+        return format_lowlevel(self, level=level)
+
+    def __str__(self) -> str:
+        return self.report()
+
+    def __repr__(self) -> str:
+        return self.report()
+
     def to_dict(self, *, include_values: bool = False) -> dict[str, Any]:
         """Return a JSON-serializable representation."""
         out = {

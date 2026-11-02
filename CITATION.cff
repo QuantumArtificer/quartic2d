@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If QUARTIC2D contributes to published research, cite the archived software release used in the calculation."
 title: "QUARTIC2D: Quadrature for Radial Tetra-center Interaction Coefficients in 2D"
 type: software
-version: 0.1.0
-date-released: 2026-09-29
+version: 0.1.1
+date-released: 2026-11-02
 abstract: >-
   QUARTIC2D evaluates four-center interaction matrix elements for generalized
   localized orbital bases in two dimensions with translationally invariant

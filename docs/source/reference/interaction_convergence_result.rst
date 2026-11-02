@@ -11,6 +11,15 @@ reference error.
 
 .. autoclass:: InteractionConvergenceResult
 
+Quick reports
+-------------
+
+Use ``print(result)`` for a compact summary or
+``result.report(level="full")`` for the numerical-method settings and actual
+acceptance tests. The ``to_dict()`` method retains machine-readable evidence.
+The numerical self-convergence checks must not be mistaken for an independent
+accuracy guarantee. See :doc:`convergence_reporting`.
+
 Common operations
 -----------------
 

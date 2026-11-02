@@ -2,6 +2,23 @@
 
 All notable changes to QUARTIC2D will be documented in this file.
 
+## [0.1.1] - 2026-11-02
+
+### Added
+- Structured convergence-failure reports with quantitative diagnostics, explicit API locations for corrective actions, and inspectable exceptions.
+- Compact and full scientific reports for harmonic-transform and interaction calibration, including measured criteria, selected parameters, and available upstream provenance.
+- Optional structured progress callbacks for explicit convergence searches.
+- Public `quartic2d.PolarDecomposition` backed by PETAL2D, with compact/full decomposition reports and serializable numerical metadata.
+- Regression tests for reporting, failed convergence searches, PETAL2D compatibility, and end-to-end public imports.
+
+### Changed
+- Guided examples and user documentation now use the unified `quartic2d` import path for polar decomposition, harmonic transforms, and interactions.
+- API documentation includes polar decomposition and convergence reporting directly in the reference navigation.
+- Convergence messages distinguish failed numerical criteria from input-representation limits and avoid unsupported accuracy claims.
+
+### Fixed
+- Calibration failures that previously discarded useful numerical context now preserve structured failure information where available.
+
 ## [0.1.0] - 2026-09-29
 
 ### Added

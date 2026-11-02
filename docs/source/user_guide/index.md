@@ -21,7 +21,7 @@ Direct, exchange, pair-hopping, correlated-hopping, and general orbital products
 :::{grid-item-card} Preparing transition fields
 :link: transition_fields
 :link-type: doc
-Callable and sampled complex transition fields, PETAL2D representation, reconstruction diagnostics, and plotting helpers.
+Callable and sampled complex transition fields, QUARTIC2D's PETAL2D-backed PolarDecomposition, reconstruction reports, and plotting helpers.
 :::
 :::{grid-item-card} Momentum-space harmonics
 :link: harmonic_transforms
@@ -36,7 +36,7 @@ Displacement arrays, harmonic-pair contributions, interaction calibration, and m
 :::{grid-item-card} Convergence and diagnostics
 :link: convergence_and_diagnostics
 :link-type: doc
-Tolerance semantics, automatic parameter searches, convergence records, failure inspection, and parameter reuse.
+Compact and publication-ready reports, tolerance semantics, actionable failures, convergence evidence, and parameter reuse.
 :::
 :::{grid-item-card} Choosing numerical methods
 :link: numerical_methods
@@ -54,6 +54,16 @@ Built-in plotting helpers, transformed harmonics, interaction arrays, angular-pa
 Reuse of transformed fields and calibrated parameters, provenance records, scaling, and repeated calculations.
 :::
 ::::
+
+## One public import for the entire workflow
+
+```python
+from quartic2d import PolarDecomposition, HarmonicTransform, Interaction
+```
+
+The real-space decomposition uses PETAL2D internally. All three stages can be
+accessed from QUARTIC2D without a separate PETAL2D import; the original
+PETAL2D API continues to work.
 
 ## A practical numerical workflow
 

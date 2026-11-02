@@ -7,6 +7,11 @@ import quartic2d
 
 def test_public_api_is_minimal_and_explicit():
     assert quartic2d.__all__ == [
+        "ConvergenceAction",
+        "ConvergenceError",
+        "ConvergenceFailureReport",
+        "ProgressEvent",
+        "PolarDecomposition",
         "HankelTransform",
         "HarmonicConvergenceResult",
         "HarmonicTransform",
@@ -22,7 +27,7 @@ def test_convergence_results_are_public_types():
 
 
 def test_version_is_public():
-    assert quartic2d.__version__ == "0.1.0"
+    assert quartic2d.__version__ == "0.1.1"
 
 
 def test_legacy_top_level_names_are_not_exposed():

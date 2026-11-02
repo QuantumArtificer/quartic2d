@@ -18,6 +18,15 @@ from ._plot_style import (
 from ._plot_style import (
     clean_axes as _clean_axes,
 )
+from .reporting import (
+    ConvergenceAction,
+    ConvergenceError,
+    ConvergenceFailureReport,
+    _scalar,
+    format_harmonic,
+    format_interaction,
+    interaction_failure,
+)
 
 __all__ = ["HarmonicConvergenceResult", "InteractionConvergenceResult"]
 
@@ -96,6 +105,7 @@ class HarmonicConvergenceResult:
     rtol: float
     atol: float
     q_tail_rtol: float
+    provenance: dict[str, Any] = field(default_factory=dict, repr=False)
 
     @property
     def converged(self) -> bool:
@@ -142,6 +152,8 @@ class HarmonicConvergenceResult:
         """
         from .interaction import HarmonicTransform
 
+        if not self.converged:
+            raise ConvergenceError(self.failure)
         field = HarmonicTransform(decomposition, check=check, **self.parameters)
         field._sampling_convergence = self.sampling
         field._quadrature_convergence = self.quadrature
@@ -312,6 +324,39 @@ class HarmonicConvergenceResult:
                 fig.suptitle(title)
             return fig, axes
 
+    @property
+    def failure(self) -> ConvergenceFailureReport | None:
+        """Failure details, or ``None`` if every configured test passed."""
+        if self.converged:
+            return None
+        if not self.sampling.tail_converged:
+            return ConvergenceFailureReport(
+                code="Q_RANGE_NOT_ESTABLISHED", stage="hankel_q_range",
+                explanation="The calculation could not establish how far in momentum the transform must extend.",
+                requested={"q_tail_rtol": self.q_tail_rtol},
+                actions=(ConvergenceAction("PolarDecomposition", "Nr",
+                            "Inspect radial resolution and the original Cartesian samples."),),
+            )
+        if not self.sampling.interpolation_converged:
+            return ConvergenceFailureReport(
+                code="Q_INTERPOLATION_NOT_CONVERGED", stage="hankel_q_interpolation",
+                explanation="Values between the saved momentum points still differ too much from direct transforms.",
+                requested={"rtol": self.rtol},
+                actions=(ConvergenceAction("HarmonicTransform", "q_grid",
+                            "Refine the momentum grid and recalibrate the transform."),),
+            )
+        return ConvergenceFailureReport(
+            code="HANKEL_QUADRATURE_NOT_CONVERGED", stage="hankel_quadrature",
+            explanation="Refining the radial integration still changes the Hankel transform too much.",
+            requested={"rtol": self.rtol, "atol": self.atol},
+            actions=(ConvergenceAction("HarmonicTransform.converge_parameters", "subdivisions",
+                        "Extend tested radial integration refinements."),),
+        )
+
+    def report(self, *, level: str = "summary") -> str:
+        """Return a compact or publication-oriented numerical report."""
+        return format_harmonic(self, level=level)
+
     def to_dict(self) -> dict:
         """Return a JSON-serializable calibration record.
 
@@ -327,37 +372,17 @@ class HarmonicConvergenceResult:
             "atol": float(self.atol),
             "q_tail_rtol": float(self.q_tail_rtol),
             "parameters": self.parameters,
+            "provenance": _scalar(self.provenance),
+            "failure": None if self.failure is None else self.failure.to_dict(),
             "sampling": self.sampling.to_dict(),
             "quadrature": self.quadrature.to_dict(),
         }
 
     def __str__(self) -> str:
-        p = self.parameters
-        lines = [
-            "HarmonicTransform convergence",
-            "-----------------------------",
-            f"numerical target (rtol) : {self.rtol:.1e}",
-            f"absolute target (atol)  : {self.atol:.1e}",
-            f"q-tail target           : {self.q_tail_rtol:.1e}  (relative L2 norm beyond q_max)",
-            f"q_max                   : {p['q_max']:.6g}",
-            f"n_q                     : {p['n_q']}",
-            f"method                  : {p['method']}",
-        ]
-        if "subdivisions" in p:
-            lines.append(f"radial subdivisions     : {p['subdivisions']}")
-        if "N" in p:
-            lines.append(f"Ogata N                 : {p['N']}")
-        if "h" in p:
-            lines.append(f"Ogata h                 : {p['h']:.6g}")
-        lines.extend(
-            [
-                "",
-                f"q support               : {'PASS' if self.sampling.tail_converged else 'FAIL'}",
-                f"q-grid interpolation    : {'PASS' if self.sampling.interpolation_converged else 'FAIL'}",
-                f"radial quadrature       : {'PASS' if self.quadrature.converged else 'FAIL'}",
-            ]
-        )
-        return "\n".join(lines)
+        return self.report()
+
+    def __repr__(self) -> str:
+        return self.report()
 
 
 @dataclass
@@ -408,6 +433,7 @@ class InteractionConvergenceResult:
     interpolator: str
     rtol: float
     atol: float
+    provenance: dict[str, Any] = field(default_factory=dict, repr=False)
     _interaction_class: type | None = field(
         default=None, init=False, repr=False, compare=False
     )
@@ -458,7 +484,7 @@ class InteractionConvergenceResult:
         requires a separate numerical justification.
         """
         if not self.converged:
-            raise RuntimeError("Cannot build an interaction from unconverged parameters.")
+            raise ConvergenceError(self.failure)
         if self._interaction_class is None:
             from .interaction import Interaction
 
@@ -727,6 +753,15 @@ class InteractionConvergenceResult:
         axes[1].set_ylabel("evaluation time [s]")
         _clean_axes(axes[1])
 
+    @property
+    def failure(self) -> ConvergenceFailureReport | None:
+        """Numerical evidence for an unsuccessful interaction calibration."""
+        return interaction_failure(self)
+
+    def report(self, *, level: str = "summary") -> str:
+        """Return the short or detailed convergence report without recomputation."""
+        return format_interaction(self, level=level)
+
     def to_dict(self, *, include_values: bool = False) -> dict[str, Any]:
         """Return a JSON-serializable calibration record.
 
@@ -747,21 +782,13 @@ class InteractionConvergenceResult:
             "rtol": float(self.rtol),
             "atol": float(self.atol),
             "parameters": self.parameters,
+            "provenance": _scalar(self.provenance),
+            "failure": None if self.failure is None else self.failure.to_dict(),
             "search": self.search.to_dict(include_values=include_values),
         }
 
     def __str__(self) -> str:
-        lines = [
-            "Interaction convergence",
-            "-----------------------",
-            f"numerical target (rtol) : {self.rtol:.1e}",
-            f"absolute target (atol)  : {self.atol:.1e}",
-            f"method                  : {self.method}",
-            f"status                  : {'PASS' if self.converged else 'FAIL'}",
-        ]
-        for key, value in self.search.selected_parameters.items():
-            if isinstance(value, float):
-                lines.append(f"{key:24s}: {value:.6g}")
-            else:
-                lines.append(f"{key:24s}: {value}")
-        return "\n".join(lines)
+        return self.report()
+
+    def __repr__(self) -> str:
+        return self.report()

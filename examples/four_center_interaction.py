@@ -1,9 +1,8 @@
 """Direct and exchange four-center terms from normalized s and p_x orbitals."""
 
 import numpy as np
-from petal2d import PolarDecomposition
 
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 
 def orbital_s(x, y):

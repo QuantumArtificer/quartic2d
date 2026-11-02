@@ -56,12 +56,12 @@ print(quartic2d.__version__)
 ```
 
 ```text
-0.1.0
+0.1.1
 ```
 
-## 1. Represent the transition field with PETAL2D
+## 1. Represent the transition field
 
-PETAL2D expands the transition field as
+`quartic2d.PolarDecomposition` uses PETAL2D internally. The transition field is expanded as
 
 $$
 \rho(r,\theta)=\sum_m\rho_m(r)e^{im\theta}.
@@ -69,8 +69,7 @@ $$
 
 ```python
 import numpy as np
-from petal2d import PolarDecomposition
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 x = np.linspace(-6.0, 6.0, 181)
 y = np.linspace(-6.0, 6.0, 181)
@@ -95,6 +94,9 @@ print("selected pairs:", dec.selected_pairs)
 print("retained modes:", dec.m_sorted)
 print(f"measured reconstruction error [%]: {dec.recon_error_measured:.3e}")
 print(f"domain consistency: {dec.domain_consistency:.8f}")
+
+print(dec.report())              # Compact summary
+print(dec.report(level="full"))  # Grid and reconstruction settings
 ```
 
 Rotational symmetry leaves only $m=0$. Before transforming a new field, inspect

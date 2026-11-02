@@ -1,9 +1,8 @@
 """End-to-end isotropic Gaussian interaction with automatic convergence."""
 
 import numpy as np
-from petal2d import PolarDecomposition
 
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 
 def density(x, y):

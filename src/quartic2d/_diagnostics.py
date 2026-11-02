@@ -97,13 +97,12 @@ class HarmonicTransformDiagnostics:
         """Return one compact user-facing warning for all detected issues."""
         if self.healthy:
             return ""
-        lines = ["QUARTIC2D detected possible harmonic-transform numerical under-resolution:"]
-        lines.extend(f"- {issue.message}" for issue in self.issues)
-        lines.append(
-            "The transform was returned, but these checks are indicators rather "
-            "than error estimates. Run HarmonicTransform.converge_parameters(...) "
-            "to obtain parameters selected by an explicit convergence study."
-        )
+        lines = ["QUARTIC2D · Transform checks: REVIEW"]
+        for issue in self.issues[:4]:
+            lines.append(f"  {issue.code}: {issue.message}")
+        if len(self.issues) > 4:
+            lines.append(f"  (+{len(self.issues) - 4} other checks; see diagnostics.issues)")
+        lines.append("  Check: HarmonicTransform.converge_parameters(...)")
         return "\n".join(lines)
 
 

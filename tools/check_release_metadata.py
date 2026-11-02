@@ -24,7 +24,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--tag",
-        help="release tag to validate, for example v0.1.0; release-mode checks are enabled when supplied",
+        help="release tag to validate, for example v0.1.1; release-mode checks are enabled when supplied",
     )
     args = parser.parse_args()
 

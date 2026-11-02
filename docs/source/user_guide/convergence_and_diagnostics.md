@@ -24,6 +24,50 @@ interaction = ical.interaction(deltas, field_13, field_42, U_q)
 The returned result objects preserve both the selected production parameters and
 the numerical history used to select them.
 
+## Numerical reports and failure recovery
+
+Polar decomposition and both convergence results have a consistent reporting
+interface. The full report records the tested criteria and numerical settings;
+the compact report is intended for quick inspection.
+
+```python
+print(decomposition.report())             # Polar representation checks
+print(hcal.report())                      # Compact transform report
+print(ical.report())                      # Compact interaction report
+print(ical.report(level="full"))         # Detailed numerical-method record
+record = ical.to_dict()                  # JSON-compatible numerical evidence
+```
+
+The decomposition report includes the *measured* reconstruction error and the
+harmonic-selection target. It does not claim that the sampled Cartesian input
+field is accurate. The convergence reports give selected settings and measured
+refinement changes; they do not provide an independent reference comparison.
+For distinct input fields, save both harmonic calibration reports as well as
+the interaction report.
+
+If a numerical search raises `ConvergenceError`, the exception carries a
+structured report with measured and requested values:
+
+```python
+from quartic2d import ConvergenceError
+
+try:
+    hcal = HarmonicTransform.converge_parameters(decomposition)
+except ConvergenceError as exc:
+    print(exc)                            # Short explanation and next action
+    print(exc.report.format(level="full"))
+    record = exc.report.to_dict()          # Measured values and tested settings
+```
+
+Corrective suggestions identify the API location, such as
+`PolarDecomposition(Nr=...)` for the input radial grid, or
+`Interaction.converge_parameters(subdivisions=...)` for an interaction
+quadrature search. Not every numerical failure can be diagnosed uniquely.
+The library must state what it actually measured rather than guessing.
+
+The report API is documented in {doc}`../reference/convergence_reporting`.
+
+
 (convergence-tolerance-table)=
 ## Tolerance vocabulary
 

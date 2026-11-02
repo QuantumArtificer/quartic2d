@@ -1,9 +1,8 @@
 """Complex localized orbitals and off-diagonal four-center interactions."""
 
 import numpy as np
-from petal2d import PolarDecomposition
 
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 
 def orbital_s(x, y):

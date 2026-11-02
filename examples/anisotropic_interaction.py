@@ -1,9 +1,8 @@
 """Orientation-dependent interaction of a quadrupolar localized transition field."""
 
 import numpy as np
-from petal2d import PolarDecomposition
 
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 ANISOTROPY = 0.35
 KAPPA = 0.4

@@ -29,3 +29,11 @@ python examples/isotropic_interaction.py
 
 The corresponding equations, selected output, plots, and interpretation are in
 `docs/source/examples/`.
+
+## Public imports
+
+All guided examples import `PolarDecomposition`, `HarmonicTransform`, and
+`Interaction` directly from `quartic2d`. PETAL2D remains the implementation
+of the real-space decomposition, but users need only the QUARTIC2D public API.
+The decomposition wrapper adds `report()` and `to_dict()` for reproducibility;
+its numerical decomposition and plotting methods are inherited unchanged.

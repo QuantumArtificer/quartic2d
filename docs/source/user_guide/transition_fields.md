@@ -7,7 +7,9 @@ $$
 \rho_{ij}(x,y)=\phi_i^*(x,y)\phi_j(x,y).
 $$
 
-PETAL2D represents each transition field by radial circular harmonics. These
+`quartic2d.PolarDecomposition` uses PETAL2D to represent each transition field
+by radial circular harmonics. QUARTIC2D exposes the class and adds numerical
+reports without replacing PETAL2D's decomposition algorithms. These
 radial functions are the real-space input to `HarmonicTransform`.
 
 ## Callable fields
@@ -18,7 +20,7 @@ $s$--$p_x$ transition field:
 
 ```python
 import numpy as np
-from petal2d import PolarDecomposition
+from quartic2d import PolarDecomposition
 
 
 def orbital_s(x, y):
@@ -46,10 +48,18 @@ dec_sp = PolarDecomposition(
 )
 
 print(dec_sp.m_sorted)
+print(dec_sp.report())
 ```
 
 For this real field PETAL2D retains the conjugate $m=\pm1$ pair, up to the exact
 ordering used by the PETAL2D version.
+
+For an archival summary of input grid spacing, retained harmonic indices,
+per-harmonic radial cutoffs, selection settings, measured reconstruction error,
+and software versions, use `dec_sp.report(level="full")`. The corresponding
+JSON-compatible metadata is available from `dec_sp.to_dict()`; this is not an
+export of all input-field samples or radial profiles. Neither output establishes
+the accuracy of the original supplied field.
 
 The chosen origin defines the angular expansion center. It must be consistent
 with the centers used when the displacement vectors are defined.

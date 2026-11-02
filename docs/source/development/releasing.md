@@ -18,14 +18,17 @@ Check the metadata before tagging:
 python tools/check_release_metadata.py
 ```
 
-For the current unreleased 0.1.0 state, the checker prints
+For the 0.1.1 release state, the checker prints
 
 ```text
-package version : 0.1.0
-citation version: 0.1.0
-changelog state : Unreleased
+package version : 0.1.1
+citation version: 0.1.1
+changelog state : 2026-11-02
 release metadata: consistent
 ```
+
+If the actual release takes place on a different date, update both the
+changelog heading and `CITATION.cff` before creating the tag.
 
 Install the maintainer dependencies:
 
@@ -119,22 +122,25 @@ python -m pip install dist/*.whl
 cd /tmp
 python - <<'PY'
 import quartic2d
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
+
 print(quartic2d.__version__)
-print(quartic2d.__all__)
 PY
 deactivate
 ```
 
-For version 0.1.0 the import block prints
+For version 0.1.1 the import block prints
 
 ```text
-0.1.0
-['HankelTransform', 'HarmonicConvergenceResult', 'HarmonicTransform', 'Interaction', 'InteractionConvergenceResult', '__version__']
+0.1.1
 ```
 
-## 5. Enable GitHub Pages
+The named imports confirm that the public decomposition and interaction API
+was included in the built wheel.
 
-Before the first public release, enable GitHub Pages for the repository from
+## 5. Verify GitHub Pages
+
+If Pages is not already enabled, enable it from
 **Settings → Pages → Build and deployment → Source → GitHub Actions**. The
 `Documentation` workflow builds and validates the Sphinx site on every push to
 `main` and deploys that verified artifact through the `github-pages`
@@ -158,9 +164,9 @@ No long-lived PyPI token is stored in the repository.
 
 Official guidance: [Publishing package distribution releases](https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/) and [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/).
 
-## 7. Enable Zenodo before the first tag
+## 7. Verify Zenodo integration
 
-Connect the GitHub account to Zenodo, synchronize repositories, and enable `QuantumArtificer/quartic2d` before publishing the first release tag.
+Confirm `QuantumArtificer/quartic2d` is enabled in the GitHub integration on Zenodo before publishing `v0.1.1`. The previous `v0.1.0` archive does not automatically guarantee that a new version has finished processing.
 
 QUARTIC2D uses `CITATION.cff` as the release metadata source. Add `.zenodo.json` only if Zenodo-specific metadata are needed. When `.zenodo.json` is present, Zenodo uses it instead of `CITATION.cff` for GitHub-release metadata.
 
@@ -172,10 +178,10 @@ Commit the fully checked release state, then create an annotated tag:
 
 ```bash
 git status --short
-python tools/check_release_metadata.py --tag v0.1.0
-git tag -a v0.1.0 -m "QUARTIC2D v0.1.0"
+python tools/check_release_metadata.py --tag v0.1.1
 git push origin main
-git push origin v0.1.0
+git tag -a v0.1.1 -m "QUARTIC2D v0.1.1"
+git push origin v0.1.1
 ```
 
 For a clean tree, `git status --short` prints nothing. `check_release_metadata.py --tag ...` must end with `release metadata: consistent` before the tag is created.
@@ -204,6 +210,6 @@ After the workflow succeeds:
 4. confirm the Zenodo record contains the correct title, author, version, license, and repository link
 5. record the version DOI after Zenodo creates it
 
-The DOI does not exist before the first archive is created. Add it to the next source commit and to subsequent citation metadata. Do not rewrite the already published tag solely to insert an identifier that did not exist when that source state was created.
+The new version DOI is assigned when Zenodo archives the new GitHub Release. Preserve the published tag; add any new DOI references in a subsequent commit rather than rewriting that tag.
 
 The release lint gate uses the repository-local Ruff policy in `pyproject.toml` through the `dev` extra. User-level Ruff configuration is not part of the release contract.

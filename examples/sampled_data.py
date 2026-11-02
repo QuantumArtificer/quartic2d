@@ -1,9 +1,8 @@
 """Complex transition fields supplied as sampled Cartesian arrays."""
 
 import numpy as np
-from petal2d import PolarDecomposition
 
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 
 def yukawa(q, kappa=0.5):

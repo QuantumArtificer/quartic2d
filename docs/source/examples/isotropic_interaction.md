@@ -35,8 +35,7 @@ $$
 
 ```python
 import numpy as np
-from petal2d import PolarDecomposition
-from quartic2d import HarmonicTransform, Interaction
+from quartic2d import HarmonicTransform, Interaction, PolarDecomposition
 
 x = np.linspace(-6.0, 6.0, 181)
 y = np.linspace(-6.0, 6.0, 181)

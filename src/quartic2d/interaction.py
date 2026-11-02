@@ -32,6 +32,15 @@ from ._numerics import (
     validate_interpolator,
 )
 from .convergence import HarmonicConvergenceResult, InteractionConvergenceResult
+from .reporting import (
+    ConvergenceAction,
+    ConvergenceError,
+    ConvergenceFailureReport,
+    decomposition_provenance,
+    emit_progress,
+    field_provenance,
+    software_versions,
+)
 
 __all__ = ["HankelTransform", "HarmonicTransform", "Interaction"]
 
@@ -594,7 +603,11 @@ class HarmonicTransform:
         interpolator: str = "cubic",
         subdivisions: Iterable[int] = (1, 2, 4, 8, 16, 32),
         pilot_subdivisions: int = 2,
+        tail_pilot_oversampling: tuple[float, ...] = (4.0, 8.0, 16.0, 32.0, 64.0),
+        interpolation_oversampling: tuple[float, ...] = (4.0, 6.0, 8.0, 12.0, 16.0),
         verbose: bool = True,
+        progress=None,
+        provenance: dict | None = None,
     ) -> HarmonicConvergenceResult:
         r"""Find harmonic-transform parameters that meet explicit numerical tolerances.
 
@@ -649,9 +662,18 @@ class HarmonicTransform:
             backend.  If the requested backend requires a finer radial
             refinement, only the canonical sampling study is repeated at that
             finer resolution before returning the selected parameters.
+        tail_pilot_oversampling : sequence of floats, optional
+            Candidate momentum sampling densities for checking the selected
+            cutoff. Higher density does not increase the maximum resolvable q.
+        interpolation_oversampling : sequence of floats, optional
+            Uniform q-grid test densities after adaptive refinement fails.
         verbose : bool, default=True
-            Print one compact convergence report.  Set to ``False`` for batch
-            jobs; the returned result still contains the full diagnostics.
+            Print a compact convergence report.  Set to ``False`` for batch jobs.
+        progress : callable or None, optional
+            Callback receiving structured ``ProgressEvent`` objects during calibration.
+        provenance : dict or None, optional
+            User-defined identifiers, units, and physical input information saved
+            with the numerical result.  Does not affect the calculation.
 
         Returns
         -------
@@ -689,15 +711,37 @@ class HarmonicTransform:
         # finer ordered resolution.  Candidate refinements increase strictly,
         # so the loop cannot return to a coarser level.
         for _ in range(3):
-            sampling = converge_q_sampling(
-                decomposition,
-                method="simpson",
-                interpolator=interpolator,
-                subdivisions=sampling_subdivisions,
-                q_tail_rtol=q_tail_rtol,
-                interpolation_rtol=rtol,
-                interpolation_atol=atol,
-            )
+            emit_progress(progress, "hankel_q_sampling", "started",
+                          parameters={"pilot_subdivisions": sampling_subdivisions})
+            try:
+                sampling = converge_q_sampling(
+                    decomposition,
+                    method="simpson",
+                    interpolator=interpolator,
+                    subdivisions=sampling_subdivisions,
+                    q_tail_rtol=q_tail_rtol,
+                    interpolation_rtol=rtol,
+                    interpolation_atol=atol,
+                    tail_pilot_oversampling=tail_pilot_oversampling,
+                    interpolation_oversampling=interpolation_oversampling,
+                    progress=progress,
+                )
+            except ConvergenceError as exc:
+                emit_progress(progress, exc.report.stage, "failed",
+                              parameters=exc.report.observed)
+                raise
+            except RuntimeError as exc:
+                report = ConvergenceFailureReport(
+                    code="HANKEL_SAMPLING_SEARCH_STOPPED", stage="hankel_q_sampling",
+                    explanation="The momentum-grid search stopped without meeting its criteria.",
+                    requested={"q_tail_rtol": q_tail_rtol, "rtol": rtol,
+                               "atol": atol},
+                    evidence={"upstream_error": str(exc)},
+                )
+                emit_progress(progress, "hankel_q_sampling", "failed")
+                raise ConvergenceError(report) from exc
+            emit_progress(progress, "hankel_q_sampling", "completed",
+                          parameters={"q_max": sampling.q_max, "n_q": sampling.n_q})
             transform = cls(
                 decomposition,
                 q_max=sampling.q_max,
@@ -708,6 +752,8 @@ class HarmonicTransform:
                 subdivisions=sampling_subdivisions,
                 check=False,
             )
+            emit_progress(progress, "hankel_quadrature", "started",
+                          parameters={"method": method})
             quadrature = transform.converge(
                 rtol=rtol,
                 atol=atol,
@@ -715,17 +761,37 @@ class HarmonicTransform:
                 apply=False,
             )
             if not quadrature.converged or not quadrature.selected_parameters:
-                raise RuntimeError(
-                    "Radial quadrature did not converge for every retained harmonic. "
-                    "Inspect the convergence result or expand the candidate range."
+                mode_history = quadrature.metadata.get("harmonics", {})
+                failed = tuple(int(m) for m, d in mode_history.items()
+                               if not d.get("converged", False))
+                report = ConvergenceFailureReport(
+                    code="HANKEL_QUADRATURE_NOT_CONVERGED", stage="hankel_quadrature",
+                    explanation="Increasing radial integration resolution still changes the transform too much.",
+                    requested={"rtol": rtol, "atol": atol},
+                    observed={"tested subdivisions": list(subdivisions)},
+                    limiting_harmonics=failed,
+                    actions=(ConvergenceAction("HarmonicTransform.converge_parameters",
+                            "subdivisions", "Extend the candidate refinement sequence."),),
+                    evidence={"quadrature": quadrature.to_dict()},
                 )
+                emit_progress(progress, "hankel_quadrature", "failed")
+                raise ConvergenceError(report)
+            emit_progress(progress, "hankel_quadrature", "completed",
+                          parameters=quadrature.selected_parameters)
             selected = int(quadrature.selected_parameters["subdivisions"])
             required_sampling_subdivisions = max(sampling_subdivisions, selected)
             if required_sampling_subdivisions == sampling_subdivisions:
                 break
             sampling_subdivisions = required_sampling_subdivisions
         else:  # pragma: no cover - monotonic defensive guard
-            raise RuntimeError("Harmonic-transform convergence did not stabilize.")
+            raise ConvergenceError(ConvergenceFailureReport(
+                code="HANKEL_CALIBRATION_NOT_STABLE", stage="hankel_calibration",
+                explanation="Rechecking momentum sampling after radial refinement did not stabilize.",
+                observed={"last pilot subdivisions": sampling_subdivisions},
+                requested={"rtol": rtol, "atol": atol},
+                evidence={"sampling": sampling.to_dict(),
+                          "quadrature": quadrature.to_dict()},
+            ))
 
         result = HarmonicConvergenceResult(
             sampling=sampling,
@@ -735,7 +801,12 @@ class HarmonicTransform:
             rtol=float(rtol),
             atol=float(atol),
             q_tail_rtol=float(q_tail_rtol),
+            provenance={"software": software_versions(),
+                        "decomposition": decomposition_provenance(decomposition),
+                        "user": dict(provenance or {})},
         )
+        emit_progress(progress, "harmonic_calibration", "completed",
+                      parameters=result.parameters)
         if verbose:
             print(result)
         return result
@@ -1528,6 +1599,8 @@ class Interaction:
         q_boundary_taper_fraction: float = 0.1,
         q_boundary_budget_fraction: float = 0.5,
         verbose: bool = True,
+        progress=None,
+        provenance: dict | None = None,
     ) -> InteractionConvergenceResult:
         r"""Calibrate the assembled interaction for explicit numerical criteria.
 
@@ -1599,8 +1672,12 @@ class Interaction:
             Fraction of the requested ``rtol``/``atol`` budget allocated to the
             q-boundary robustness probe.  Must satisfy ``0 < value <= 1``.
         verbose : bool, default=True
-            Print one compact convergence report.  Set to ``False`` for batch
-            calculations; the returned object retains the complete search.
+            Print a compact convergence report.  Set to ``False`` for batch jobs.
+        progress : callable or None, optional
+            Callback receiving structured ``ProgressEvent`` objects during calibration.
+        provenance : dict or None, optional
+            User-defined identifiers, units, and kernel information saved with
+            the result.  Does not affect the calculation.
 
         Returns
         -------
@@ -1680,6 +1757,8 @@ class Interaction:
                 dtype=np.complex128,
             )
             evaluated[key] = values
+            emit_progress(progress, "interaction_quadrature", "evaluated",
+                          parameters=dict(parameters), completed=len(evaluated))
             return values
 
         if method in {"trapezoid", "simpson", "gl4", "gl8"}:
@@ -1845,8 +1924,20 @@ class Interaction:
             interpolator=interpolator,
             rtol=float(rtol),
             atol=float(atol),
+            provenance={"software": software_versions(),
+                        "field1": field_provenance(field1),
+                        "field2": field_provenance(field2),
+                        "displacements": {"count": int(deltas.shape[0]),
+                                          "min_distance": float(np.min(np.linalg.norm(deltas, axis=1))),
+                                          "max_distance": float(np.max(np.linalg.norm(deltas, axis=1)))},
+                        "kernel": {"module": getattr(U_q, "__module__", None),
+                                   "name": getattr(U_q, "__qualname__", None)},
+                        "user": dict(provenance or {})},
         )
         result._interaction_class = cls
+        emit_progress(progress, "interaction_calibration",
+                      "completed" if result.converged else "failed",
+                      parameters=result.parameters)
         if verbose:
             print(result)
         return result

@@ -222,3 +222,21 @@ interaction_record = interaction_calibration.to_dict()
 These compact dictionaries are intended for logs, metadata files, and
 reproducibility records. Use `InteractionConvergenceResult.to_dict(include_values=True)`
 only when the full arrays from each refinement step are required.
+
+## Numerical reports for reproducibility
+
+`result.report()` (or `print(result)`) gives a compact account of the selected
+parameters and numerical acceptance tests. `result.report(level="full")`
+shows the detailed evidence needed to describe the tested numerical setup.
+The real-space `PolarDecomposition` wrapper follows the same convention.
+
+```python
+print(decomposition.report(level="full"))
+print(hcal.report(level="full"))
+print(ical.report(level="full"))
+```
+
+`to_dict()` preserves available numerical metadata for programmatic analysis.
+The original input field, physical units, and interaction-kernel definition
+cannot be inferred reliably from a Python callable; record them separately
+for a reproducible publication.
